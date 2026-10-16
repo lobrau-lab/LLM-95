@@ -1,6 +1,8 @@
 {
   "name": "LLM-95",
-  "description": "Explore a retro OS that brings back nostalgic memories with an AI twist.",
+  "description": "A retro Windows 95 OS powered by an on-device, self-contained local LLM inference engine and bootable virtual machine image.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

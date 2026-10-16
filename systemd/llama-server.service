@@ -1,0 +1,35 @@
+[Unit]
+Description=llama.cpp High-Performance On-Device GGUF Inference Engine
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=llama
+Group=llama
+WorkingDirectory=/models
+EnvironmentFile=-/etc/default/llama-server
+Environment=MODEL_PATH=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+Environment=THREADS=4
+Environment=PORT=8080
+Environment=CTX_SIZE=2048
+
+# Spawn native llama-server with CPU AVX2 optimizations and locked context memory
+ExecStart=/usr/local/bin/llama-server \
+    --model ${MODEL_PATH} \
+    --host 127.0.0.1 \
+    --port ${PORT} \
+    --threads ${THREADS} \
+    --ctx-size ${CTX_SIZE} \
+    --batch-size 512 \
+    --mlock \
+    --cont-batching
+
+Restart=always
+RestartSec=3
+LimitMEMLOCK=infinity
+CPUSchedulingPolicy=other
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

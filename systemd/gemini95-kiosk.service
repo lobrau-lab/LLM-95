@@ -1,0 +1,32 @@
+[Unit]
+Description=Gemini-95 Fullscreen Kiosk Mode (Cage Wayland Compositor)
+After=gemini95-web.service
+Wants=gemini95-web.service
+
+[Service]
+Type=simple
+User=gemini
+Group=gemini
+PAMName=login
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+Environment=MOZ_ENABLE_WAYLAND=1
+
+# Launch Cage Wayland kiosk compositor wrapping Chromium or Firefox in kiosk mode
+ExecStart=/usr/bin/cage -s -- /usr/bin/chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --check-for-update-interval=31536000 \
+    --no-first-run \
+    --fast \
+    --fast-start \
+    --disable-features=TranslateUI \
+    --disk-cache-dir=/tmp/chromium-cache \
+    http://127.0.0.1:3000
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

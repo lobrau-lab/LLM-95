@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Windows 95 Simulator</title>
+    <title>LLM-95</title>
+    <meta name="description" content="A retro Windows 95 OS powered by an on-device, self-contained local LLM inference engine and bootable virtual machine image." />
+    <meta property="og:title" content="LLM-95" />
+    <meta property="og:description" content="A retro Windows 95 OS powered by an on-device, self-contained local LLM inference engine and bootable virtual machine image." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,7 +16,6 @@
     <script type="importmap">
       {
         "imports": {
-          "@google/genai": "https://esm.sh/@google/genai@0.7.0",
           "@tailwindcss/browser": "https://esm.sh/@tailwindcss/browser@^4.1.3"
         }
       }
@@ -23,6 +25,14 @@
   <body>
     <div class="desktop" id="desktop">
       <!-- Desktop Icons -->
+      <div class="icon" data-app="llamaEngine">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/processor-3.png"
+          alt="LLM Engine"
+          style="width: 48px; height: 48px"
+        />
+        <span>LLM-95 Engine & VM</span>
+      </div>
       <div class="icon" data-app="myComputer">
         <img
           src="https://storage.googleapis.com/gemini-95-icons/mycomputer.png"
@@ -76,6 +86,148 @@
 
 
       <!-- Windows -->
+      <div class="window resizable" id="llamaEngine" style="width: 620px; height: 500px; display: none;">
+        <div class="window-titlebar">
+          <span class="window-title">LLM-95: On-Device Engine & VM Manager</span>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+        <div class="window-content">
+          <div class="engine-tabs-header">
+            <div class="engine-tab active" data-tab="tab-monitor">System & Health</div>
+            <div class="engine-tab" data-tab="tab-models">Model Registry</div>
+            <div class="engine-tab" data-tab="tab-benchmark">Inference Sandbox</div>
+            <div class="engine-tab" data-tab="tab-vm">VM & Container Export</div>
+          </div>
+          <div class="engine-tab-body">
+            <!-- Tab 1: Monitor -->
+            <div class="tab-pane active" id="tab-monitor">
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Runtime Status</legend>
+                <div class="status-row">
+                  <span>Inference Mode:</span>
+                  <span class="status-pill online" id="engine-status-pill">● ON-DEVICE RUNTIME ACTIVE</span>
+                </div>
+                <div class="status-row">
+                  <span>Active Model:</span>
+                  <strong id="active-model-name-label">Llama-3.2-3B-Instruct-Q4_K_M.gguf</strong>
+                </div>
+                <div class="status-row">
+                  <span>Architecture:</span>
+                  <span>CPU (Vector: AVX2 / ARM NEON) — 4 Cores Allocated</span>
+                </div>
+                <div class="status-row">
+                  <span>Cloud API:</span>
+                  <span style="color: green; font-weight: bold;">DISABLED (100% Air-Gapped)</span>
+                </div>
+              </fieldset>
+
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Hardware Activity & Latency</legend>
+                <div class="gauge-container">
+                  <span class="gauge-label">CPU Load:</span>
+                  <div class="gauge-bar-outer"><div class="gauge-bar-fill" id="cpu-gauge" style="width: 38%;"></div></div>
+                  <span class="gauge-value" id="cpu-val">38%</span>
+                </div>
+                <div class="gauge-container">
+                  <span class="gauge-label">RAM In-Use:</span>
+                  <div class="gauge-bar-outer"><div class="gauge-bar-fill" id="ram-gauge" style="width: 27%;"></div></div>
+                  <span class="gauge-value" id="ram-val">2.1 / 8.0 GB</span>
+                </div>
+                <div class="status-row" style="margin-top: 6px;">
+                  <span>Latency: <strong id="latency-val">32 ms</strong></span>
+                  <span>Speed: <strong id="speed-val">6.8 tok/s</strong></span>
+                  <span>Context: <strong>2048 ctx</strong></span>
+                </div>
+              </fieldset>
+
+              <div style="display: flex; gap: 6px; margin-top: auto;">
+                <button class="win95-btn" id="btn-refresh-health">Ping /health API</button>
+                <button class="win95-btn" id="btn-view-raw-health">Toggle JSON Telemetry</button>
+                <span id="health-ping-time" style="margin-left: auto; align-self: center; font-size: 0.75rem; color: #444;">Last ping: Just now</span>
+              </div>
+              <div id="raw-health-display" class="win95-terminal" style="display: none; height: 90px; overflow-y: auto; margin-top: 4px;"></div>
+            </div>
+
+            <!-- Tab 2: Models -->
+            <div class="tab-pane" id="tab-models">
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Bundled GGUF Quantized Models</legend>
+                <p style="margin: 0 0 6px 0; font-size: 0.75rem; color: #333;">
+                  Select a quantized GGUF model to load into CPU memory:
+                </p>
+                <table class="model-list-table">
+                  <thead>
+                    <tr>
+                      <th>Preset</th>
+                      <th>Size</th>
+                      <th>Parameters</th>
+                      <th>Quant</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="model-table-body">
+                    <!-- Populated via TS -->
+                  </tbody>
+                </table>
+              </fieldset>
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Custom Model Path (MODEL_PATH)</legend>
+                <div style="display: flex; gap: 4px;">
+                  <input type="text" id="custom-model-input" value="/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf" style="flex-grow: 1; font-family: monospace; font-size: 0.75rem; padding: 2px;" />
+                  <button class="win95-btn" id="btn-apply-model-path">Load Path</button>
+                </div>
+              </fieldset>
+            </div>
+
+            <!-- Tab 3: Benchmark Sandbox -->
+            <div class="tab-pane" id="tab-benchmark">
+              <fieldset class="win95-fieldset" style="flex-grow: 1; display: flex; flex-direction: column;">
+                <legend class="win95-legend">Direct On-Device Prompt Execution</legend>
+                <div style="display: flex; gap: 6px; margin-bottom: 4px;">
+                  <input type="text" id="sandbox-prompt-input" placeholder="Type a prompt (e.g. Write a haiku about a 486 processor)..." style="flex-grow: 1; padding: 3px; font-size: 0.8rem;" />
+                  <button class="win95-btn" id="btn-run-benchmark">Execute</button>
+                </div>
+                <div style="display: flex; gap: 12px; font-size: 0.75rem; margin-bottom: 4px;">
+                  <span>Tokens: <strong id="bench-tokens">0</strong></span>
+                  <span>Latency: <strong id="bench-time">0 ms</strong></span>
+                  <span>Throughput: <strong id="bench-speed">0.0 tok/s</strong></span>
+                </div>
+                <div class="win95-terminal" id="sandbox-output" style="flex-grow: 1; overflow-y: auto; white-space: pre-wrap;">Ready for on-device inference execution...</div>
+              </fieldset>
+            </div>
+
+            <!-- Tab 4: VM & Appliance -->
+            <div class="tab-pane" id="tab-vm">
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Virtual Machine Appliance Specs</legend>
+                <div style="font-size: 0.75rem; line-height: 1.4;">
+                  <div>• <strong>Appliance Disk Image:</strong> <code>llama95-vm.qcow2</code> (Max 8.0 GB footprint)</div>
+                  <div>• <strong>Hypervisor Support:</strong> QEMU/KVM, VirtualBox, Proxmox VE, VMware</div>
+                  <div>• <strong>Runtime Stack:</strong> Alpine Linux 3.20 + llama.cpp + Node.js 20</div>
+                  <div>• <strong>Kiosk Shell:</strong> Cage Wayland compositor wrapping Chromium fullscreen</div>
+                </div>
+              </fieldset>
+              <fieldset class="win95-fieldset" style="flex-grow: 1;">
+                <legend class="win95-legend">Launch & Build Commands</legend>
+                <div class="win95-terminal" id="vm-qemu-command" style="user-select: all; height: 90px;">qemu-system-x86_64 \
+  -enable-kvm -m 8G -smp 4 \
+  -drive file=build-output/llama95-vm.qcow2,format=qcow2 \
+  -net nic,model=virtio -net user,hostfwd=tcp::3000-:3000 \
+  -vga virtio</div>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                  <button class="win95-btn" id="btn-copy-qemu">Copy QEMU Command</button>
+                  <button class="win95-btn" id="btn-copy-podman">Podman Run Command</button>
+                  <button class="win95-btn" id="btn-view-readme">View README.md</button>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="window resizable" id="myComputer">
         <div class="window-titlebar">
           <span class="window-title">My Gemtop</span>
@@ -239,7 +391,7 @@
 
       <div class="window resizable" id="gemini">
         <div class="window-titlebar">
-          <span class="window-title">Gemini App</span>
+          <span class="window-title">Llama 95 AI Chat (On-Device CPU)</span>
           <div class="window-controls">
             <div class="window-minimize window-control-button">−</div>
             <div class="window-close window-control-button">✕</div>
@@ -355,12 +507,13 @@
 
       <!-- Start Menu -->
       <div class="start-menu" id="start-menu">
+        <div class="start-menu-item" data-app="llamaEngine">⚡ LLM-95 Engine & VM</div>
         <div class="start-menu-item" data-app="myComputer">My Gemtop</div>
         <div class="start-menu-item" data-app="chrome">Chrome</div>
         <div class="start-menu-item" data-app="notepad">GemNotes</div>
         <div class="start-menu-item" data-app="paint">GemPaint</div>
         <div class="start-menu-item" data-app="doom">Doom II</div>
-        <div class="start-menu-item" data-app="gemini">Gemini App</div>
+        <div class="start-menu-item" data-app="gemini">Llama 95 Chat</div>
         <div class="start-menu-item" data-app="minesweeper">GemSweeper</div>
         <div class="start-menu-item" data-app="mediaPlayer">GemPlayer</div>
       </div>
