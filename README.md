@@ -132,6 +132,26 @@ The project provides three levels of virtualization:
 
 ---
 
+## 🧙‍♂️ Automated Hardware Scanner & Sealed VM OS Provisioning Wizard
+
+LLM-95 includes an **"Out of the Box Experience" (OOBE) Setup Wizard** designed around the sealed virtual machine architecture:
+
+### 1. First-Launch Automated Hardware Diagnostic Probe (`GET /api/hardware/scan`):
+- **CPU & SIMD Architecture**: Detects Apple Silicon ARM NEON vs Intel/AMD x86_64 AVX2/AVX-512.
+- **Hardware Concurrency**: Evaluates physical and logical CPU cores to allocate optimal tensor threads.
+- **RAM Envelope Calculation**: Calculates memory requirements to guarantee the model and context fit within the sealed 8.0 GB VM boundary without swapping.
+- **Hypervisor & Drivers**: Confirms VirtIO-GPU (Apple Metal 3 Direct Passthrough) and VirtIO-Sound (macOS CoreAudio 48kHz).
+- **Automated Recommendation**: The system scores your hardware and flags the **best-match GGUF model** with a gold badge:
+  - *Standard 8GB VM (4-8 cores)*: **Llama-3.2-3B-Instruct (Q4_K_M)** (Recommended)
+  - *Lightweight / Low-RAM*: **SmolLM2-1.7B-Instruct** or **Gemma-2-2B-it**
+  - *Heavy Workstations*: **Mistral-7B-Instruct-v0.3**
+
+### 2. Direct Download into Sealed VM Storage & OS Kernel Flash (`POST /api/vm/provision`):
+- When a model is chosen, the system streams the quantized GGUF weights directly into `/models/[model].gguf` inside the virtual disk image.
+- **The Model Becomes the Operating System**: The model is flashed to `/models/kernel-brain.gguf` as PID 1 (Autonomous OS Pilot). It directly drives the terminal, shell commands, window manager, file manipulation, and hardware virtualization drivers.
+- **Persistence**: Choices are saved to local state (`llm95_selected_model`, `llm95_setup_completed`, `llm95_hardware_profile`). Subsequent boots instantly restore your sealed OS configuration without re-prompting.
+- **Re-run Anytime**: Launch the "Setup Wizard" icon from Desktop, Start Menu, or the "LLM-95 Engine & VM Manager".
+
 ## 🛠️ Quick Start Guide
 
 ### 1. Development Mode (with Vite)

@@ -1,5 +1,4 @@
-# Symlink / mirror of Containerfile for Docker compatibility
-# syntax=docker/dockerfile:1
+# Mirror of Containerfile for Docker compatibility with macOS Tahoe VirtIO drivers
 FROM alpine:3.20 AS llama-builder
 RUN apk add --no-cache git build-base cmake linux-headers musl-dev cflags libstdc++
 WORKDIR /build
@@ -16,7 +15,7 @@ RUN npm run build
 
 FROM alpine:3.20
 LABEL maintainer="lordlobrau@gmail.com"
-LABEL description="Bootable on-device LLM OS running Windows 95 Retro Interface"
+LABEL description="Bootable on-device LLM OS with macOS Tahoe tuned VirtIO drivers and full AI operator"
 
 ARG MODEL_URL="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
 ARG MODEL_NAME="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
@@ -28,9 +27,18 @@ ENV MODEL_PATH=/models/${MODEL_NAME}
 ENV LLAMA_SERVER_URL=http://127.0.0.1:8080
 ENV THREADS=4
 ENV CTX_SIZE=2048
+ENV MESA_LOADER_DRIVER_OVERRIDE=virtio_gpu
 
-RUN apk add --no-cache nodejs npm libstdc++ libgomp cage chromium mesa-dri-gallium seatd udev dbus supervisor curl bash tini font-noto font-noto-emoji shadow
-RUN useradd -u 1000 -U -d /home/gemini -m -s /bin/bash gemini && mkdir -p /models /app /var/log/gemini95 /etc/supervisor/conf.d
+RUN apk add --no-cache nodejs npm libstdc++ libgomp cage chromium mesa-dri-gallium virglrenderer mesa-va-gallium seatd udev dbus alsa-lib alsa-utils pipewire dpkg binutils tar xz zstd supervisor curl bash tini font-noto font-noto-emoji shadow
+RUN useradd -u 1000 -U -d /home/gemini -m -s /bin/bash gemini && mkdir -p /models /app /var/log/gemini95 /etc/supervisor/conf.d /etc/alsa/conf.d
+
+RUN cat <<'EOF' > /etc/asound.conf
+pcm.!default {
+    type plug
+    slave { pcm "hw:0,0" rate 48000 channels 2 format S24_LE period_size 512 buffer_size 2048 }
+}
+ctl.!default { type hw card 0 }
+EOF
 
 COPY --from=llama-builder /build/build/bin/llama-server /usr/local/bin/llama-server
 RUN chmod +x /usr/local/bin/llama-server
@@ -79,7 +87,7 @@ stderr_logfile=/var/log/gemini95/web_err.log
 
 [program:kiosk]
 command=/usr/bin/cage -s -- /usr/bin/chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run --disk-cache-dir=/tmp/chromium-cache http://127.0.0.1:3000
-environment=XDG_RUNTIME_DIR="/run/user/1000",WLR_LIBINPUT_NO_DEVICES="1"
+environment=XDG_RUNTIME_DIR="/run/user/1000",WLR_LIBINPUT_NO_DEVICES="1",MESA_LOADER_DRIVER_OVERRIDE="virtio_gpu"
 autostart=false
 autorestart=true
 user=gemini
@@ -90,7 +98,8 @@ RUN cat <<'EOF' > /entrypoint.sh
 #!/bin/bash
 set -e
 echo "=========================================================="
-echo "   LLAMA-95: ON-DEVICE INFERENCE ENGINE & RETRO OS        "
+echo "   LLM-95: ON-DEVICE INFERENCE ENGINE & RETRO OS          "
+echo "   Tuned for macOS Tahoe Virtualization (Metal 3 & CoreAudio)"
 echo "=========================================================="
 echo "Target Model: ${MODEL_PATH}"
 echo "Hardware: $(nproc) CPU Cores detected"

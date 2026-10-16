@@ -25,6 +25,14 @@
   <body>
     <div class="desktop" id="desktop">
       <!-- Desktop Icons -->
+      <div class="icon" data-app="setupWizard">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/installer-0.png"
+          alt="Setup Wizard"
+          style="width: 48px; height: 48px"
+        />
+        <span>Setup Wizard</span>
+      </div>
       <div class="icon" data-app="llamaEngine">
         <img
           src="https://win98icons.alexmeub.com/icons/png/processor-3.png"
@@ -63,9 +71,25 @@
       <div class="icon" data-app="gemini">
         <img
           src="https://storage.googleapis.com/gemini-95-icons/GeminiChatRetro.png"
-          alt="Gemini App"
+          alt="LLM-95 OS Pilot"
         />
-        <span>Gemini App</span>
+        <span>LLM-95 OS Pilot</span>
+      </div>
+      <div class="icon" data-app="terminalWindow">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/ms_dos-0.png"
+          alt="MS-DOS Prompt"
+          style="width: 48px; height: 48px"
+        />
+        <span>MS-DOS Prompt</span>
+      </div>
+      <div class="icon" data-app="packageManager">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/add_remove_programs-0.png"
+          alt="Package Manager"
+          style="width: 48px; height: 48px"
+        />
+        <span>Package Manager</span>
       </div>
       <div class="icon" data-app="minesweeper">
         <img
@@ -86,6 +110,171 @@
 
 
       <!-- Windows -->
+      <!-- LLM-95 Hardware Scanner & Sealed VM OS Provisioning Wizard -->
+      <div class="window resizable" id="setupWizard" style="width: 660px; height: 530px; display: none;">
+        <div class="window-titlebar">
+          <span class="window-title">LLM-95 OS Provisioning & Hardware Setup Wizard</span>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+        <div class="window-content wizard-window-content">
+          <div class="wizard-banner">
+            <img src="https://win98icons.alexmeub.com/icons/png/installer-0.png" alt="Setup" class="wizard-banner-icon" />
+            <div class="wizard-banner-text">
+              <div class="wizard-banner-title">LLM-95 Operating System Setup</div>
+              <div class="wizard-banner-subtitle">Hardware Diagnostics &amp; Sealed VM OS Provisioning</div>
+            </div>
+            <div class="wizard-step-indicator" id="wizard-step-indicator">Step 1 of 4</div>
+          </div>
+
+          <div class="wizard-stepper-bar">
+            <div class="wizard-step-node active" data-step="1">1. Hardware Scan</div>
+            <div class="wizard-step-node" data-step="2">2. Model Selection</div>
+            <div class="wizard-step-node" data-step="3">3. VM Download &amp; Flash</div>
+            <div class="wizard-step-node" data-step="4">4. OS Ready</div>
+          </div>
+
+          <div class="wizard-body-area">
+            <!-- Step 1: Hardware Scan -->
+            <div class="wizard-page active" id="wizard-step-1">
+              <p class="wizard-lead-text">
+                LLM-95 analyzes your physical CPU architecture, vector units, memory envelope, and virtualization drivers to select the optimal on-device language model:
+              </p>
+
+              <div class="wizard-hardware-grid">
+                <div class="wiz-hw-card">
+                  <div class="wiz-hw-title">Processor &amp; SIMD</div>
+                  <div class="wiz-hw-val" id="wiz-cpu-name">Scanning CPU...</div>
+                  <div class="wiz-hw-sub" id="wiz-cpu-vector">Vector SIMD: Probing...</div>
+                </div>
+                <div class="wiz-hw-card">
+                  <div class="wiz-hw-title">CPU Cores &amp; Threads</div>
+                  <div class="wiz-hw-val" id="wiz-cpu-cores">Scanning cores...</div>
+                  <div class="wiz-hw-sub">Allocated for CPU tensor operations</div>
+                </div>
+                <div class="wiz-hw-card">
+                  <div class="wiz-hw-title">Memory &amp; VM Envelope</div>
+                  <div class="wiz-hw-val" id="wiz-ram-info">Scanning RAM...</div>
+                  <div class="wiz-hw-sub">8.0 GB Sealed VM RAM ceiling</div>
+                </div>
+                <div class="wiz-hw-card">
+                  <div class="wiz-hw-title">Virtual Drivers (macOS Tahoe)</div>
+                  <div class="wiz-hw-val" id="wiz-drivers-info">VirtIO-GPU + VirtIO-Sound</div>
+                  <div class="wiz-hw-sub">Metal 3 Direct Passthrough &amp; 48kHz Audio</div>
+                </div>
+              </div>
+
+              <div class="wizard-benchmark-box">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 3px;">
+                  <span>Hardware Micro-Benchmark Score:</span>
+                  <strong id="wiz-bench-rating">Calculating SIMD throughput...</strong>
+                </div>
+                <div class="gauge-bar-outer"><div class="gauge-bar-fill" id="wiz-bench-bar" style="width: 0%;"></div></div>
+              </div>
+
+              <div class="wizard-rec-callout" id="wiz-rec-callout">
+                <div class="wizard-rec-badge">★ HARDWARE MATCH RECOMMENDATION</div>
+                <div style="font-size: 0.82rem; font-weight: bold; color: #000080;" id="wiz-rec-title">Analyzing optimal model...</div>
+                <div style="font-size: 0.74rem; color: #333; margin-top: 2px;" id="wiz-rec-desc">Evaluating memory overhead, token latency, and OS reasoning constraints...</div>
+              </div>
+
+              <div class="wizard-nav-bar">
+                <button class="win95-btn" id="wiz-btn-rescan">🔄 Re-scan Hardware</button>
+                <button class="win95-btn wizard-primary-btn" id="wiz-btn-step1-next" style="margin-left: auto;">Next: Review Model Options &gt;&gt;</button>
+              </div>
+            </div>
+
+            <!-- Step 2: Model Selection -->
+            <div class="wizard-page" id="wizard-step-2" style="display: none;">
+              <p class="wizard-lead-text">
+                Select the quantized GGUF model to download directly into the virtual machine. This model will be flashed as the <strong>Operating System Kernel Pilot</strong>:
+              </p>
+
+              <div class="wizard-models-list" id="wiz-models-list">
+                <!-- Dynamically populated with models -->
+              </div>
+
+              <div class="wizard-constraint-notice">
+                <strong>⚠ Sealed VM Operating System Constraint:</strong>
+                <div>• The chosen model will be downloaded into <code>/models</code> inside the 8.0GB disk image.</div>
+                <div>• It acts as PID 1 (Autonomous OS Operator) directly driving terminal, windows, and apps without cloud access.</div>
+                <div>• Choices will be saved and persisted for all subsequent boots.</div>
+              </div>
+
+              <div class="wizard-nav-bar">
+                <button class="win95-btn" id="wiz-btn-step2-back">&lt;&lt; Back</button>
+                <button class="win95-btn wizard-primary-btn" id="wiz-btn-step2-next" style="margin-left: auto;">Download Model into VM &amp; Install OS &gt;&gt;</button>
+              </div>
+            </div>
+
+            <!-- Step 3: Downloading & Flashing -->
+            <div class="wizard-page" id="wizard-step-3" style="display: none;">
+              <p class="wizard-lead-text">
+                Downloading model directly into the sealed VM area and flashing operating system kernel:
+              </p>
+
+              <div class="wizard-download-status-card">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <span style="font-weight: bold;" id="wiz-download-model-label">Llama-3.2-3B-Instruct-Q4_K_M.gguf</span>
+                  <span style="font-size: 0.72rem; color: #222;" id="wiz-download-stats">0% (0 / 2,020 MB) — 48 MB/s</span>
+                </div>
+                <div class="gauge-bar-outer" style="margin: 6px 0;">
+                  <div class="gauge-bar-fill" id="wiz-download-bar" style="width: 0%;"></div>
+                </div>
+                <div style="font-size: 0.72rem; color: #555;" id="wiz-download-eta">Connecting to repository mirror...</div>
+              </div>
+
+              <div class="wizard-terminal" id="wiz-flashing-terminal">
+                <pre class="terminal-pre">[LLM-95 KERNEL FLASH SEQUENCE STARTED]
+Mounting /models virtual partition (8.0 GB ext4 volume)...
+Awaiting model payload stream...</pre>
+              </div>
+
+              <div class="wizard-nav-bar">
+                <span style="font-size: 0.74rem; color: #555; align-self: center;">Please do not power off the virtual machine during kernel flash.</span>
+              </div>
+            </div>
+
+            <!-- Step 4: Ready -->
+            <div class="wizard-page" id="wizard-step-4" style="display: none;">
+              <div class="wizard-success-header">
+                <img src="https://win98icons.alexmeub.com/icons/png/check-0.png" alt="Check" style="width: 48px; height: 48px;" />
+                <div>
+                  <div style="font-size: 1rem; font-weight: bold; color: #000080;">Model Downloaded &amp; Sealed OS Activated!</div>
+                  <div style="font-size: 0.75rem; color: #333;">Your virtual machine is now fully operating on-device with zero cloud reliance.</div>
+                </div>
+              </div>
+
+              <fieldset class="win95-fieldset" style="margin-top: 8px;">
+                <legend class="win95-legend">Sealed Virtual Machine Configuration</legend>
+                <div class="status-row"><span>Operating System Brain:</span><strong id="wiz-final-model-name">Llama-3.2-3B-Instruct-Q4_K_M.gguf</strong></div>
+                <div class="status-row"><span>Storage Location:</span><code>/models/kernel-brain.gguf (Sealed VM Disk)</code></div>
+                <div class="status-row"><span>RAM Consumption:</span><span id="wiz-final-ram">~2.4 GB / 8.0 GB (5.6 GB free for user apps)</span></div>
+                <div class="status-row"><span>Hardware Virtualization:</span><span>macOS Tahoe Hypervisor (HVF)</span></div>
+                <div class="status-row"><span>Virtual Graphics:</span><span class="status-pill online">● VirtIO-GPU Metal 3 (120Hz HiDPI)</span></div>
+                <div class="status-row"><span>Virtual Sound:</span><span class="status-pill online">● VirtIO-Sound CoreAudio (48kHz Stereo)</span></div>
+                <div class="status-row"><span>Autonomous Operator:</span><span style="color: green; font-weight: bold;">PID 1 OS Pilot Active</span></div>
+              </fieldset>
+
+              <div style="margin: 8px 0; font-size: 0.75rem;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="wiz-remember-choice" checked />
+                  <span>Remember my configuration and launch directly into LLM-95 OS on future boots</span>
+                </label>
+              </div>
+
+              <div class="wizard-nav-bar" style="margin-top: auto;">
+                <button class="win95-btn wizard-primary-btn" id="wiz-btn-finish" style="font-size: 0.85rem; font-weight: bold; margin-left: auto;">
+                  🚀 Boot into LLM-95 Operating System
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="window resizable" id="llamaEngine" style="width: 620px; height: 500px; display: none;">
         <div class="window-titlebar">
           <span class="window-title">LLM-95: On-Device Engine & VM Manager</span>
@@ -143,9 +332,10 @@
                 </div>
               </fieldset>
 
-              <div style="display: flex; gap: 6px; margin-top: auto;">
+              <div style="display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap;">
+                <button class="win95-btn" id="btn-relaunch-wizard" style="font-weight: bold; color: #000080;">⚙️ Hardware Setup &amp; OS Provisioning Wizard</button>
                 <button class="win95-btn" id="btn-refresh-health">Ping /health API</button>
-                <button class="win95-btn" id="btn-view-raw-health">Toggle JSON Telemetry</button>
+                <button class="win95-btn" id="btn-view-raw-health">Toggle Telemetry</button>
                 <span id="health-ping-time" style="margin-left: auto; align-self: center; font-size: 0.75rem; color: #444;">Last ping: Just now</span>
               </div>
               <div id="raw-health-display" class="win95-terminal" style="display: none; height: 90px; overflow-y: auto; margin-top: 4px;"></div>
@@ -389,20 +579,135 @@
         </div>
       </div>
 
-      <div class="window resizable" id="gemini">
+      <div class="window resizable" id="gemini" style="width: 440px; height: 460px;">
         <div class="window-titlebar">
-          <span class="window-title">Llama 95 AI Chat (On-Device CPU)</span>
+          <span class="window-title">LLM-95 OS Pilot (Autonomous Operator)</span>
           <div class="window-controls">
             <div class="window-minimize window-control-button">−</div>
             <div class="window-close window-control-button">✕</div>
           </div>
         </div>
-        <div class="window-content gemini-chat-content">
+        <div class="window-content gemini-chat-content" style="display: flex; flex-direction: column;">
+          <div class="pilot-status-banner">
+            <span>🤖 AUTONOMOUS PILOT: ACTIVE</span>
+            <span style="font-size: 0.68rem; color: #88FF88;">macOS Tahoe VirtIO Ready</span>
+          </div>
+          <div class="quick-actions-bar">
+            <button class="quick-action-pill" data-pilot="paint">🎨 Draw in Paint</button>
+            <button class="quick-action-pill" data-pilot="notepad">📝 Write in GemNotes</button>
+            <button class="quick-action-pill" data-pilot="terminal">💻 Run lspci in Terminal</button>
+            <button class="quick-action-pill" data-pilot="package">📦 Install htop</button>
+            <button class="quick-action-pill" data-pilot="minesweeper">💣 Play Minesweeper</button>
+            <button class="quick-action-pill" data-pilot="theme">🖥️ Desktop Color</button>
+          </div>
           <div class="gemini-chat-history">
           </div>
           <div class="gemini-chat-input-area">
-            <input type="text" class="gemini-chat-input" placeholder="Type your message..." />
+            <input type="text" class="gemini-chat-input" placeholder="Tell me what to do or operate on this computer..." />
             <button class="gemini-chat-send">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MS-DOS Prompt / LLM-95 Terminal Window -->
+      <div class="window resizable" id="terminalWindow" style="width: 580px; height: 380px; display: none;">
+        <div class="window-titlebar">
+          <span class="window-title">MS-DOS Prompt - LLM-95 Terminal (macOS Tahoe VirtIO)</span>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+        <div class="window-content terminal-app-content">
+          <div class="terminal-quick-bar">
+            <button class="terminal-pill-btn" data-cmd="lspci">lspci</button>
+            <button class="terminal-pill-btn" data-cmd="driver-status">driver-status</button>
+            <button class="terminal-pill-btn" data-cmd="sound-test">sound-test</button>
+            <button class="terminal-pill-btn" data-cmd="pkg list">pkg list</button>
+            <button class="terminal-pill-btn" data-cmd="pkg install htop">pkg install htop</button>
+            <button class="terminal-pill-btn" data-cmd="neofetch">neofetch</button>
+            <button class="terminal-pill-btn" data-cmd="uname -a">uname -a</button>
+            <button class="terminal-pill-btn" data-cmd="clear">clear</button>
+          </div>
+          <div class="terminal-screen" id="terminal-screen">
+            <pre class="terminal-pre">Microsoft(R) Windows 95
+   (C)Copyright Microsoft Corp 1981-1995.
+LLM-95 Tahoe Appliance v1.0 [VirtIO-GPU Metal 3 / VirtIO-Sound CoreAudio]
+Connected to Web Gateway. Multi-Package Manager Active (.apk, .deb, .arch).
+Type 'help' for command list.
+</pre>
+          </div>
+          <div class="terminal-input-row">
+            <span class="terminal-prompt">C:\LLM95&gt;&nbsp;</span>
+            <input type="text" id="terminal-input" class="terminal-input" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Add/Remove Programs & Package Manager Window -->
+      <div class="window resizable" id="packageManager" style="width: 560px; height: 460px; display: none;">
+        <div class="window-titlebar">
+          <span class="window-title">Add/Remove Programs & Package Manager</span>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+        <div class="window-content" style="background-color: #C0C0C0; padding: 6px;">
+          <div class="engine-tabs-header">
+            <div class="engine-tab active" data-tab="tab-pkg-installed">Installed Software</div>
+            <div class="engine-tab" data-tab="tab-pkg-web">Web Repositories</div>
+            <div class="engine-tab" data-tab="tab-pkg-drivers">macOS Tahoe Drivers</div>
+          </div>
+          <div class="engine-tab-body">
+            <!-- Tab 1: Installed -->
+            <div class="tab-pane active" id="tab-pkg-installed">
+              <p style="margin: 0 0 6px 0; font-size: 0.75rem;">Currently installed system packages (.apk, .deb, .arch):</p>
+              <div style="flex-grow: 1; overflow-y: auto; border: 2px inset #808080; background: white;">
+                <table class="model-list-table">
+                  <thead>
+                    <tr><th>Package</th><th>Version</th><th>Format</th><th>Size</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="installed-pkg-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Tab 2: Web Repositories -->
+            <div class="tab-pane" id="tab-pkg-web">
+              <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+                <input type="text" id="pkg-search-input" placeholder="Search .deb, .apk, .arch packages online (e.g. htop, ffmpeg)..." style="flex-grow: 1; padding: 2px 4px; font-size: 0.75rem;" />
+                <button class="win95-btn" id="btn-search-pkg">Search Web</button>
+              </div>
+              <div style="flex-grow: 1; overflow-y: auto; border: 2px inset #808080; background: white; margin-bottom: 6px;">
+                <table class="model-list-table">
+                  <thead>
+                    <tr><th>Package</th><th>Version</th><th>Format</th><th>Size</th><th>Install</th></tr>
+                  </thead>
+                  <tbody id="available-pkg-tbody"></tbody>
+                </table>
+              </div>
+              <div id="pkg-install-progress-container" style="display: none; padding: 4px; border: 1px inset #808080; background: #eee;">
+                <div style="font-size: 0.75rem; margin-bottom: 2px;" id="pkg-install-status-text">Pulling package over web...</div>
+                <div class="gauge-bar-outer"><div class="gauge-bar-fill" id="pkg-install-progress-bar" style="width: 0%;"></div></div>
+              </div>
+            </div>
+            <!-- Tab 3: macOS Tahoe Drivers -->
+            <div class="tab-pane" id="tab-pkg-drivers">
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">VirtIO-GPU (Metal 3 Acceleration)</legend>
+                <div class="status-row"><span>Driver Module:</span><strong>virtio_gpu (Mesa Gallium 24.1.0)</strong></div>
+                <div class="status-row"><span>Host Acceleration:</span><span class="status-pill online">● METAL 3 DIRECT PASSTHROUGH</span></div>
+                <div class="status-row"><span>Display Sync:</span><span>Adaptive 120Hz ProMotion / 60Hz Retina</span></div>
+              </fieldset>
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">VirtIO-Sound (CoreAudio Low-Latency)</legend>
+                <div class="status-row"><span>Audio Device:</span><strong>virtio_snd ALSA Kernel Module</strong></div>
+                <div class="status-row"><span>Host Pipeline:</span><span class="status-pill online">● macOS CoreAudio 48,000 Hz Stereo</span></div>
+                <div class="status-row"><span>Latency Buffer:</span><strong>512 frames (~10.6ms) Zero-Jitter</strong></div>
+                <div class="status-row"><span>Compatibility:</span><span>Sound Blaster 16 Emulation on IRQ 5</span></div>
+                <button class="win95-btn" id="btn-play-test-sound" style="margin-top: 6px;">🔊 Play 48kHz Test Chime</button>
+              </fieldset>
+            </div>
           </div>
         </div>
       </div>
@@ -507,13 +812,16 @@
 
       <!-- Start Menu -->
       <div class="start-menu" id="start-menu">
-        <div class="start-menu-item" data-app="llamaEngine">⚡ LLM-95 Engine & VM</div>
+        <div class="start-menu-item" data-app="setupWizard">⚙️ Hardware Setup &amp; Sealed OS Wizard</div>
+        <div class="start-menu-item" data-app="gemini">🤖 LLM-95 OS Pilot</div>
+        <div class="start-menu-item" data-app="terminalWindow">💻 MS-DOS Prompt</div>
+        <div class="start-menu-item" data-app="packageManager">📦 Package Manager</div>
+        <div class="start-menu-item" data-app="llamaEngine">⚡ LLM-95 Engine &amp; VM</div>
         <div class="start-menu-item" data-app="myComputer">My Gemtop</div>
         <div class="start-menu-item" data-app="chrome">Chrome</div>
         <div class="start-menu-item" data-app="notepad">GemNotes</div>
         <div class="start-menu-item" data-app="paint">GemPaint</div>
         <div class="start-menu-item" data-app="doom">Doom II</div>
-        <div class="start-menu-item" data-app="gemini">Llama 95 Chat</div>
         <div class="start-menu-item" data-app="minesweeper">GemSweeper</div>
         <div class="start-menu-item" data-app="mediaPlayer">GemPlayer</div>
       </div>
@@ -528,6 +836,11 @@
           />
         </button>
         <div id="taskbar-apps">
+        </div>
+        <div id="taskbar-tray">
+          <span class="taskbar-kernel-indicator" id="taskbar-kernel-indicator" title="Operating System Kernel: Sealed On-Device Model">● Sealed OS: Llama-3.2-3B</span>
+          <span class="taskbar-driver-indicator" title="VirtIO Drivers: macOS Tahoe Metal 3 & CoreAudio">🚀 Tahoe VirtIO</span>
+          <span id="taskbar-clock">12:00 PM</span>
         </div>
       </div>
 

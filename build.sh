@@ -83,6 +83,14 @@ while [[ $# -gt 0 ]]; do
                     MODEL_NAME="Gemma-2-2B-it-Q4_K_M.gguf"
                     MODEL_URL="https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf"
                     ;;
+                smollm2)
+                    MODEL_NAME="SmolLM2-1.7B-Instruct-Q4_K_M.gguf"
+                    MODEL_URL="https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF/resolve/main/smollm2-1.7b-instruct-q4_k_m.gguf"
+                    ;;
+                mistral-7b)
+                    MODEL_NAME="Mistral-7B-Instruct-v0.3-Q4_K_M.gguf"
+                    MODEL_URL="https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf"
+                    ;;
                 tinyllama)
                     MODEL_NAME="TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf"
                     MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
@@ -214,6 +222,10 @@ echo "    -drive file=${OUTPUT_DIR}/${VM_DISK_NAME},format=${TARGET_FORMAT} \\"
 echo "    -net nic,model=virtio \\"
 echo "    -net user,hostfwd=tcp::3000-:3000 \\"
 echo "    -vga virtio"
+echo ""
+echo "=== How to run on macOS Tahoe (Apple Silicon or Intel HVF) ==="
+echo "./run-macos-tahoe.sh ${OUTPUT_DIR}/${VM_DISK_NAME}"
+echo "# Tuned for VirtIO-GPU (Metal 3) & VirtIO-Sound (CoreAudio 48kHz, 512f)"
 echo ""
 echo "=== How to run directly with Podman / Docker ==="
 echo "${CONTAINER_CLI} run -d -p 3000:3000 -p 8080:8080 --name llama95 ${IMAGE_NAME}:latest"

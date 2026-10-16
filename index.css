@@ -1329,3 +1329,503 @@ body {
     background-color: #000080;
     color: white;
 }
+
+/* =======================================================
+   MS-DOS PROMPT / LLM-95 TERMINAL STYLES
+   ======================================================= */
+.terminal-app-content {
+    background-color: #000000 !important;
+    color: #00FF00;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.terminal-quick-bar {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    background-color: #1a1a1a;
+    padding: 3px;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.terminal-pill-btn {
+    background-color: #2a2a2a;
+    color: #00FF66;
+    border: 1px solid #444;
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.terminal-pill-btn:hover {
+    background-color: #00FF66;
+    color: black;
+}
+
+.terminal-screen {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #000000;
+    padding: 6px;
+    font-size: 0.8rem;
+    line-height: 1.25;
+}
+
+.terminal-pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+    color: #CCCCCC;
+}
+
+.terminal-input-row {
+    display: flex;
+    align-items: center;
+    background-color: #000000;
+    border-top: 1px solid #222;
+    padding: 4px 6px;
+    flex-shrink: 0;
+}
+
+.terminal-prompt {
+    color: #FFFF00;
+    font-weight: bold;
+    font-size: 0.85rem;
+    user-select: none;
+}
+
+.terminal-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #00FF00;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+/* =======================================================
+   AUTONOMOUS OS PILOT CHAT STYLES
+   ======================================================= */
+.pilot-status-banner {
+    background-color: #000080;
+    color: white;
+    font-size: 0.72rem;
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 500;
+    border-bottom: 1px solid #808080;
+}
+
+.quick-actions-bar {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 3px 4px;
+    background-color: #E0E0E0;
+    border-bottom: 1px solid #808080;
+    flex-shrink: 0;
+}
+
+.quick-action-pill {
+    background-color: #C0C0C0;
+    border-top: 1px solid #FFF;
+    border-left: 1px solid #FFF;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    color: black;
+}
+
+.quick-action-pill:active {
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
+    border-right: 1px solid #FFF;
+    border-bottom: 1px solid #FFF;
+}
+
+.operator-action-chip {
+    background-color: #FFFFCC;
+    border: 1px solid #CC9900;
+    color: #663300;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    margin: 4px 0;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: bold;
+    animation: flashAction 0.6s ease;
+}
+
+@keyframes flashAction {
+    0% { background-color: #FFCC00; }
+    100% { background-color: #FFFFCC; }
+}
+
+/* =======================================================
+   LLM-95 OS SETUP WIZARD & HARDWARE SCANNER STYLES
+   ======================================================= */
+.wizard-window-content {
+    background-color: #C0C0C0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+}
+
+.wizard-banner {
+    background: linear-gradient(90deg, #000080 0%, #004080 70%, #008080 100%);
+    color: white;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid #808080;
+    flex-shrink: 0;
+}
+
+.wizard-banner-icon {
+    width: 36px;
+    height: 36px;
+    filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));
+}
+
+.wizard-banner-text {
+    flex-grow: 1;
+}
+
+.wizard-banner-title {
+    font-size: 0.95rem;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.6);
+}
+
+.wizard-banner-subtitle {
+    font-size: 0.72rem;
+    color: #DDEEFF;
+}
+
+.wizard-step-indicator {
+    font-size: 0.72rem;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    white-space: nowrap;
+}
+
+.wizard-stepper-bar {
+    display: flex;
+    background-color: #D4D0C8;
+    border-bottom: 1px solid #808080;
+    padding: 2px 6px;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.wizard-step-node {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    color: #666;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    user-select: none;
+}
+
+.wizard-step-node.active {
+    font-weight: bold;
+    color: #000080;
+    background-color: #FFF;
+    border-top: 1px solid #FFF;
+    border-left: 1px solid #FFF;
+    border-right: 1px solid #808080;
+    border-bottom: 1px solid #808080;
+}
+
+.wizard-body-area {
+    padding: 10px 14px;
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.wizard-page {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.wizard-lead-text {
+    margin: 0 0 8px 0;
+    font-size: 0.77rem;
+    line-height: 1.35;
+    color: #111;
+}
+
+.wizard-hardware-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.wiz-hw-card {
+    background: #FFF;
+    border: 2px inset #808080;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.wiz-hw-title {
+    font-size: 0.68rem;
+    color: #555;
+    text-transform: uppercase;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.wiz-hw-val {
+    font-size: 0.78rem;
+    font-weight: bold;
+    color: #000080;
+    margin-bottom: 2px;
+    word-break: break-word;
+}
+
+.wiz-hw-sub {
+    font-size: 0.68rem;
+    color: #444;
+}
+
+.wizard-benchmark-box {
+    background: #E8E8E8;
+    border: 1px solid #808080;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+}
+
+.wizard-rec-callout {
+    background: #FFFFEE;
+    border: 2px solid #CCA000;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 2px;
+}
+
+.wizard-rec-badge {
+    display: inline-block;
+    background: #CCA000;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+.wizard-models-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 2px inset #808080;
+    background: white;
+    padding: 6px;
+    margin-bottom: 8px;
+}
+
+.wiz-model-option {
+    border: 1px solid #C0C0C0;
+    padding: 6px 8px;
+    cursor: pointer;
+    background: #F9F9F9;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    transition: background 0.1s ease;
+}
+
+.wiz-model-option:hover {
+    background: #EBF2FF;
+}
+
+.wiz-model-option.selected {
+    background: #D9E8FF;
+    border: 1px solid #000080;
+    box-shadow: inset 1px 1px 0 #FFF;
+}
+
+.wiz-model-option.recommended {
+    border-left: 4px solid #CCA000;
+}
+
+.wiz-model-radio {
+    margin-top: 3px;
+}
+
+.wiz-model-details {
+    flex-grow: 1;
+}
+
+.wiz-model-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+
+.wiz-model-name {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #000080;
+}
+
+.wiz-model-recommended-pill {
+    background: #FFE888;
+    color: #664400;
+    border: 1px solid #CCA000;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 0 4px;
+    border-radius: 2px;
+}
+
+.wiz-model-specs-row {
+    font-size: 0.7rem;
+    color: #444;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+
+.wiz-model-desc {
+    font-size: 0.7rem;
+    color: #333;
+    line-height: 1.25;
+}
+
+.wizard-constraint-notice {
+    background: #F0F0F0;
+    border: 1px dashed #808080;
+    padding: 6px 8px;
+    font-size: 0.71rem;
+    line-height: 1.35;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.wizard-download-status-card {
+    background: #FFF;
+    border: 2px inset #808080;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.wizard-terminal {
+    background: #000;
+    color: #00FF00;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    padding: 6px 8px;
+    border: 2px inset #808080;
+    height: 170px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.3;
+}
+
+.wizard-success-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #E8F4D9;
+    border: 2px solid #4E8B1E;
+    padding: 10px 12px;
+    border-radius: 2px;
+}
+
+.wizard-nav-bar {
+    display: flex;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #808080;
+}
+
+.wizard-primary-btn {
+    font-weight: bold !important;
+    color: #000080 !important;
+}
+
+/* Taskbar Tray */
+#taskbar-tray {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 6px;
+    border-top: 1px solid #808080;
+    border-left: 1px solid #808080;
+    border-right: 1px solid #FFF;
+    border-bottom: 1px solid #FFF;
+    background-color: #C0C0C0;
+    font-size: 0.7rem;
+    color: #000;
+    user-select: none;
+}
+
+.taskbar-kernel-indicator {
+    color: #006600;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.taskbar-kernel-indicator:hover {
+    text-decoration: underline;
+}
+
+.taskbar-driver-indicator {
+    color: #000080;
+    font-size: 0.68rem;
+    background: #E0E0E0;
+    padding: 1px 4px;
+    border: 1px solid #808080;
+}
+
+#taskbar-clock {
+    font-weight: 500;
+    font-size: 0.72rem;
+    padding-left: 2px;
+}
+
+
