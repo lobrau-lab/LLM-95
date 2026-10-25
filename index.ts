@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import '@tailwindcss/browser';
+import { initV86Window, getV86Instance } from './src/v86-window-controller';
+import { firewall } from './src/firewall-core';
+import { firewallController } from './src/firewall-window-controller';
 
 // LLM-95: On-device CPU inference retro operating system appliance
 // Tuned for macOS Tahoe Virtualization (VirtIO-GPU Metal 3 & VirtIO-Sound CoreAudio)
@@ -45,7 +48,8 @@ let ytApiLoadingPromise: Promise<void> | null = null;
 const DEFAULT_YOUTUBE_VIDEO_ID = 'WXuK6gekU1Y';
 
 // --- On-Device LLM Client ---
-let activeModelName = 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+let activeModelName = 'Gemma-2-2B-it-Q4_K_M.gguf';
+let universalInference: any;
 
 interface InferenceRequestOptions {
   prompt: string;
@@ -60,6 +64,17 @@ interface InferenceRequestOptions {
 async function requestOnDeviceInference(options: InferenceRequestOptions): Promise<string> {
   const { prompt, contextType = 'general', stream = false, temperature = 0.7, max_tokens = 512, onChunk } = options;
 
+  // 1. Direct browser-to-local-inference execution (zero latency if local engine is reachable directly)
+  if (typeof universalInference !== 'undefined' && universalInference?.isDirectConnectionAvailable()) {
+    try {
+      const directText = await universalInference.executeDirectInference(options);
+      if (directText) return directText;
+    } catch (e) {
+      console.warn('[LLM-95] Direct browser inference failed (possibly CORS or network drop), routing to server proxy:', e);
+    }
+  }
+
+  // 2. Server proxy / unified backend dispatcher
   try {
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -69,7 +84,8 @@ async function requestOnDeviceInference(options: InferenceRequestOptions): Promi
         contextType,
         stream,
         temperature,
-        max_tokens
+        max_tokens,
+        model: activeModelName
       })
     });
 
@@ -146,6 +162,1803 @@ function clientFallbackSynthesize(prompt: string, contextType: string): string {
   }
   return `[Llama-95 Engine] Operating live system on ${activeModelName} (macOS Tahoe VirtIO-GPU & Sound Active). Action complete!`;
 }
+
+// --- Universal Local Inference Engine & Auto-Detection Subsystem ---
+// Universally auto-detects and connects to Ollama (11434), LM Studio (1234), llama.cpp (8080), vLLM (8000), LocalAI, or sealed on-device core.
+
+interface LocalInferenceConnectionState {
+  type: 'ollama' | 'lmstudio' | 'llama_cpp' | 'vllm' | 'openai_generic' | 'standby';
+  name: string;
+  url: string;
+  models: string[];
+  activeModel?: string;
+  latencyMs: number;
+  healthy: boolean;
+  version?: string;
+}
+
+class UniversalInferenceManager {
+  private connection: LocalInferenceConnectionState = {
+    type: 'standby',
+    name: 'Gemma-95 On-Device Synthetic Core (Standby)',
+    url: '',
+    models: ['Gemma-2-2B-it-Q4_K_M.gguf'],
+    activeModel: activeModelName,
+    latencyMs: 32,
+    healthy: true
+  };
+  private isScanning: boolean = false;
+  private isInitialized: boolean = false;
+
+  constructor() {
+    // Initial auto-detection
+    setTimeout(() => {
+      this.autoDetect();
+    }, 400);
+
+    // Periodic heartbeat / auto-detect check every 25 seconds
+    setInterval(() => {
+      if (!this.isScanning) {
+        this.autoDetect(true);
+      }
+    }, 25000);
+  }
+
+  public getConnection(): LocalInferenceConnectionState {
+    return this.connection;
+  }
+
+  public async autoDetect(silent: boolean = false): Promise<LocalInferenceConnectionState> {
+    this.isScanning = true;
+    if (!silent) this.updateTaskbarIndicator('detecting', '⚡ Inference: Auto-Detecting...');
+
+    try {
+      const res = await fetch('/api/inference/detect');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.detected) {
+          this.connection = data.detected;
+          if (this.connection.activeModel) {
+            activeModelName = this.connection.activeModel;
+            updateTaskbarStatus(activeModelName);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Universal Inference] Server detect request skipped:', e);
+    }
+
+    // Direct browser probe if server is in standby
+    if (this.connection.type === 'standby') {
+      await this.tryClientSideDirectProbe();
+    }
+
+    this.isScanning = false;
+    this.updateUI();
+    return this.connection;
+  }
+
+  public isDirectConnectionAvailable(): boolean {
+    return this.connection.healthy && this.connection.type !== 'standby' && Boolean(this.connection.url);
+  }
+
+  public async executeDirectInference(options: InferenceRequestOptions): Promise<string> {
+    const { prompt, stream = false, temperature = 0.7, max_tokens = 512, onChunk } = options;
+    const url = this.connection.url.replace(/\/+$/, '');
+    const model = this.connection.activeModel || (this.connection.models && this.connection.models[0]) || 'local-model';
+
+    if (this.connection.type === 'ollama') {
+      const res = await fetch(`${url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          stream,
+          options: { temperature, num_predict: max_tokens }
+        })
+      });
+      if (!res.ok) throw new Error(`Ollama returned status ${res.status}`);
+
+      if (stream && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.response) {
+                fullText += parsed.response;
+                if (onChunk) onChunk(parsed.response);
+              }
+              if (parsed.done) break;
+            } catch {}
+          }
+        }
+        return fullText;
+      } else {
+        const data = await res.json();
+        const text = data.response || '';
+        if (onChunk) onChunk(text);
+        return text;
+      }
+    } else if (this.connection.type === 'lmstudio' || this.connection.type === 'openai_generic' || this.connection.type === 'vllm') {
+      const res = await fetch(`${url}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          stream,
+          temperature,
+          max_tokens
+        })
+      });
+      if (!res.ok) throw new Error(`OpenAI-compatible server returned status ${res.status}`);
+
+      if (stream && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(dataStr);
+              const chunk = parsed.choices?.[0]?.delta?.content || '';
+              if (chunk) {
+                fullText += chunk;
+                if (onChunk) onChunk(chunk);
+              }
+            } catch {}
+          }
+        }
+        return fullText;
+      } else {
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        if (onChunk) onChunk(text);
+        return text;
+      }
+    } else if (this.connection.type === 'llama_cpp') {
+      const res = await fetch(`${url}/completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          stream,
+          temperature,
+          n_predict: max_tokens
+        })
+      });
+      if (!res.ok) throw new Error(`llama.cpp returned status ${res.status}`);
+
+      if (stream && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(dataStr);
+              const chunk = parsed.content || '';
+              if (chunk) {
+                fullText += chunk;
+                if (onChunk) onChunk(chunk);
+              }
+            } catch {}
+          }
+        }
+        return fullText;
+      } else {
+        const data = await res.json();
+        const text = data.content || '';
+        if (onChunk) onChunk(text);
+        return text;
+      }
+    }
+
+    throw new Error('Unsupported direct inference engine type');
+  }
+
+  private async tryClientSideDirectProbe(): Promise<void> {
+    const savedCustomUrl = localStorage.getItem('llm95_custom_inference_url');
+    const directCandidates: Array<{ url: string; type: 'ollama' | 'lmstudio' | 'llama_cpp' | 'vllm' | 'openai_generic'; testPath: string }> = [];
+
+    if (savedCustomUrl) {
+      const clean = savedCustomUrl.replace(/\/+$/, '');
+      directCandidates.push(
+        { url: clean, type: 'openai_generic', testPath: '/v1/models' },
+        { url: clean, type: 'ollama', testPath: '/api/tags' },
+        { url: clean, type: 'llama_cpp', testPath: '/health' }
+      );
+    }
+
+    directCandidates.push(
+      // Ollama default ports
+      { url: 'http://127.0.0.1:11434', type: 'ollama' as const, testPath: '/api/tags' },
+      { url: 'http://localhost:11434', type: 'ollama' as const, testPath: '/api/tags' },
+      // LM Studio default ports
+      { url: 'http://127.0.0.1:1234', type: 'lmstudio' as const, testPath: '/v1/models' },
+      { url: 'http://localhost:1234', type: 'lmstudio' as const, testPath: '/v1/models' },
+      // llama.cpp / llamafile default ports
+      { url: 'http://127.0.0.1:8080', type: 'llama_cpp' as const, testPath: '/health' },
+      { url: 'http://localhost:8080', type: 'llama_cpp' as const, testPath: '/health' },
+      // KoboldCpp default port
+      { url: 'http://127.0.0.1:5001', type: 'openai_generic' as const, testPath: '/v1/models' },
+      { url: 'http://localhost:5001', type: 'openai_generic' as const, testPath: '/v1/models' },
+      // vLLM / FastChat default ports
+      { url: 'http://127.0.0.1:8000', type: 'vllm' as const, testPath: '/v1/models' },
+      { url: 'http://localhost:8000', type: 'vllm' as const, testPath: '/v1/models' },
+      // LocalAI default ports
+      { url: 'http://127.0.0.1:1337', type: 'openai_generic' as const, testPath: '/v1/models' },
+      { url: 'http://localhost:1337', type: 'openai_generic' as const, testPath: '/v1/models' },
+      // QEMU / UTM VM Host Gateways
+      { url: 'http://10.0.2.2:11434', type: 'ollama' as const, testPath: '/api/tags' },
+      { url: 'http://10.0.2.2:1234', type: 'lmstudio' as const, testPath: '/v1/models' },
+      { url: 'http://10.0.2.2:8080', type: 'llama_cpp' as const, testPath: '/health' },
+      { url: 'http://host.docker.internal:11434', type: 'ollama' as const, testPath: '/api/tags' },
+      { url: 'http://host.docker.internal:1234', type: 'lmstudio' as const, testPath: '/v1/models' }
+    );
+
+    for (const cand of directCandidates) {
+      try {
+        const t0 = performance.now();
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 600);
+        const res = await fetch(`${cand.url}${cand.testPath}`, { signal: ctrl.signal, mode: 'cors' });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const lat = Math.round(performance.now() - t0);
+          const data = await res.json().catch(() => ({}));
+          let models: string[] = [];
+          if (cand.type === 'ollama') {
+            models = Array.isArray(data.models) ? data.models.map((m: any) => m.name || m.model) : [];
+          } else if (cand.type === 'lmstudio' || cand.type === 'openai_generic' || cand.type === 'vllm') {
+            models = Array.isArray(data.data) ? data.data.map((m: any) => m.id) : [];
+          }
+
+          const engineDisplayName = cand.type === 'ollama'
+            ? 'Ollama (Direct Browser)'
+            : (cand.type === 'lmstudio'
+                ? 'LM Studio (Direct Browser)'
+                : (cand.type === 'llama_cpp'
+                    ? 'llama.cpp Native (Direct)'
+                    : (cand.type === 'vllm'
+                        ? 'vLLM Fast (Direct)'
+                        : 'OpenAI-Compatible Engine (Direct)')));
+
+          this.connection = {
+            type: cand.type,
+            name: engineDisplayName,
+            url: cand.url,
+            models: models.length ? models : ['local-model'],
+            activeModel: models[0] || 'local-model',
+            latencyMs: lat,
+            healthy: true
+          };
+
+          fetch('/api/inference/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: cand.url, activeModel: this.connection.activeModel })
+          }).catch(() => {});
+
+          return;
+        }
+      } catch {}
+    }
+  }
+
+  public async setCustomEndpoint(url: string, engineType?: string, model?: string): Promise<LocalInferenceConnectionState> {
+    if (url) {
+      localStorage.setItem('llm95_custom_inference_url', url.trim());
+    }
+    try {
+      const res = await fetch('/api/inference/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, forceType: engineType !== 'auto' ? engineType : undefined, activeModel: model })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.connection) {
+          this.connection = data.connection;
+          this.updateUI();
+          return this.connection;
+        }
+      }
+    } catch (e) {
+      console.warn('Set custom endpoint failed:', e);
+    }
+    return this.connection;
+  }
+
+  public updateUI(): void {
+    const pill = document.getElementById('inference-status-pill');
+    const nameEl = document.getElementById('inference-engine-name');
+    const urlEl = document.getElementById('inference-endpoint-url');
+    const latEl = document.getElementById('inference-latency-display');
+    const modelSelect = document.getElementById('inference-model-select') as HTMLSelectElement | null;
+    const urlInput = document.getElementById('custom-inference-url-input') as HTMLInputElement | null;
+    const rawDisplay = document.getElementById('inference-raw-details');
+
+    const isConnected = this.connection.type !== 'standby' && this.connection.healthy;
+
+    if (pill) {
+      pill.textContent = isConnected ? `● CONNECTED: ${this.connection.name.toUpperCase()}` : `● AIR-GAPPED ON-DEVICE STANDBY`;
+      pill.className = `status-pill ${isConnected ? 'online' : 'ready'}`;
+    }
+
+    if (nameEl) {
+      nameEl.textContent = this.connection.name;
+    }
+
+    if (urlEl) {
+      urlEl.textContent = this.connection.url || 'http://127.0.0.1 (On-Device Synthetic VM Core)';
+    }
+
+    if (latEl) {
+      latEl.textContent = `${this.connection.latencyMs || 28} ms`;
+    }
+
+    if (urlInput && !urlInput.value && this.connection.url) {
+      urlInput.value = this.connection.url;
+    }
+
+    if (modelSelect) {
+      modelSelect.innerHTML = '';
+      const models = this.connection.models && this.connection.models.length ? this.connection.models : [activeModelName];
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        if (m === this.connection.activeModel || m === activeModelName) {
+          opt.selected = true;
+        }
+        modelSelect.appendChild(opt);
+      });
+    }
+
+    if (rawDisplay) {
+      rawDisplay.textContent = JSON.stringify(this.connection, null, 2);
+    }
+
+    if (isConnected) {
+      this.updateTaskbarIndicator('connected', `⚡ ${this.connection.type.toUpperCase()}: Connected (${this.connection.latencyMs}ms)`);
+    } else {
+      this.updateTaskbarIndicator('standby', `⚡ On-Device: Sealed (${activeModelName.split('-')[0]})`);
+    }
+  }
+
+  public updateTaskbarIndicator(state: 'connected' | 'detecting' | 'standby', text: string): void {
+    const indicator = document.getElementById('taskbar-inference-indicator');
+    if (indicator) {
+      indicator.className = `taskbar-inference-indicator ${state}`;
+      indicator.textContent = text;
+      indicator.title = `Universal Local Inference Status: ${text}\nEngine: ${this.connection.name}\nClick to open Inference Settings & Auto-Detect`;
+    }
+  }
+
+  public initUI(): void {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
+    const indicator = document.getElementById('taskbar-inference-indicator');
+    indicator?.addEventListener('click', () => {
+      openApp('llamaEngine');
+      const engineWindow = document.getElementById('llamaEngine');
+      if (engineWindow) {
+        const tabs = engineWindow.querySelectorAll('.engine-tab');
+        const panes = engineWindow.querySelectorAll('.tab-pane');
+        tabs.forEach(t => t.classList.remove('active'));
+        panes.forEach(p => p.classList.remove('active'));
+        const targetTab = engineWindow.querySelector('[data-tab="tab-local-inference"]');
+        const targetPane = engineWindow.querySelector('#tab-local-inference');
+        targetTab?.classList.add('active');
+        targetPane?.classList.add('active');
+      }
+    });
+
+    const btnDetect = document.getElementById('btn-detect-inference');
+    btnDetect?.addEventListener('click', async () => {
+      if (btnDetect) btnDetect.textContent = '⏳ Scanning Ports...';
+      await this.autoDetect();
+      if (btnDetect) btnDetect.textContent = '🔍 Scan & Auto-Detect Now';
+    });
+
+    const btnTest = document.getElementById('btn-test-inference');
+    btnTest?.addEventListener('click', async () => {
+      if (btnTest) btnTest.textContent = '⚡ Testing...';
+      const rawDisplay = document.getElementById('inference-raw-details');
+      try {
+        const t0 = performance.now();
+        const testRes = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: 'Ping: test on-device inference connection handshake', stream: false })
+        });
+        const lat = Math.round(performance.now() - t0);
+        const data = await testRes.json();
+        if (rawDisplay) {
+          rawDisplay.style.display = 'block';
+          rawDisplay.textContent = `[Inference Handshake OK: ${lat}ms]\nEngine: ${data.engine || this.connection.name}\nModel: ${data.model || activeModelName}\nResponse: ${data.text}`;
+        }
+      } catch (err: any) {
+        if (rawDisplay) {
+          rawDisplay.style.display = 'block';
+          rawDisplay.textContent = `[Inference Handshake Failed]: ${err.message}`;
+        }
+      } finally {
+        if (btnTest) btnTest.textContent = '⚡ Test Inference Handshake';
+      }
+    });
+
+    const btnToggleRaw = document.getElementById('btn-toggle-inference-raw');
+    btnToggleRaw?.addEventListener('click', () => {
+      const rawDisplay = document.getElementById('inference-raw-details');
+      if (rawDisplay) {
+        rawDisplay.style.display = rawDisplay.style.display === 'none' ? 'block' : 'none';
+      }
+    });
+
+    const btnApply = document.getElementById('btn-apply-inference-url');
+    btnApply?.addEventListener('click', async () => {
+      const urlInput = document.getElementById('custom-inference-url-input') as HTMLInputElement | null;
+      const typeSelect = document.getElementById('inference-engine-type-select') as HTMLSelectElement | null;
+      const modelSelect = document.getElementById('inference-model-select') as HTMLSelectElement | null;
+      if (urlInput?.value) {
+        if (btnApply) btnApply.textContent = '⏳ Connecting...';
+        await this.setCustomEndpoint(urlInput.value.trim(), typeSelect?.value, modelSelect?.value);
+        if (btnApply) btnApply.textContent = 'Connect';
+      }
+    });
+
+    const modelSelect = document.getElementById('inference-model-select') as HTMLSelectElement | null;
+    modelSelect?.addEventListener('change', () => {
+      if (modelSelect.value) {
+        activeModelName = modelSelect.value;
+        this.connection.activeModel = modelSelect.value;
+        updateTaskbarStatus(activeModelName);
+        fetch('/api/models/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelName: activeModelName })
+        }).catch(() => {});
+      }
+    });
+
+    const btnRefreshModels = document.getElementById('btn-refresh-inference-models');
+    btnRefreshModels?.addEventListener('click', () => {
+      this.autoDetect();
+    });
+
+    this.updateUI();
+  }
+}
+
+universalInference = new UniversalInferenceManager();
+
+// --- VirtIO-Sound Audio Subsystem (macOS Tahoe CoreAudio Low-Latency) ---
+// Multi-channel system mixer, 48kHz audio context, input level VU monitoring, and channel routing
+
+export interface AudioChannelState {
+  id: string;
+  name: string;
+  volume: number;      // 0 - 100
+  balance: number;     // -100 (L) to +100 (R)
+  muted: boolean;
+  gainNode?: GainNode;
+  pannerNode?: StereoPannerNode;
+}
+
+class VirtIOSoundController {
+  private audioCtx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private volume: number = 80;
+  private isMuted: boolean = false;
+  private isInitialized: boolean = false;
+
+  private channels: Record<string, AudioChannelState> = {
+    master: { id: 'master', name: 'Volume Control', volume: 80, balance: 0, muted: false },
+    wave: { id: 'wave', name: 'Wave / Synth', volume: 85, balance: 0, muted: false },
+    speech: { id: 'speech', name: 'VirtIO Neural', volume: 75, balance: 0, muted: false },
+    cd: { id: 'cd', name: 'CD / Line In', volume: 70, balance: 0, muted: false },
+    mic: { id: 'mic', name: 'Virtual Mic', volume: 75, balance: 0, muted: false },
+    pcspk: { id: 'pcspk', name: 'PC Speaker', volume: 60, balance: 0, muted: false }
+  };
+
+  // Microphone and VU meter analysis
+  private micAnalyser: AnalyserNode | null = null;
+  private micStream: MediaStream | null = null;
+  private micSourceNode: MediaStreamAudioSourceNode | null = null;
+  private micMonitorGain: GainNode | null = null;
+  private micBoost: boolean = true;
+  private micMonitor: boolean = false;
+  private isRealMic: boolean = false;
+  private micSimActive: boolean = false;
+  private micSimOsc1: OscillatorNode | null = null;
+  private micSimOsc2: OscillatorNode | null = null;
+  private micSimGain: GainNode | null = null;
+  private micSimInterval: number | null = null;
+  private micPhase: number = 0;
+
+  // Advanced System Sound Mixer (Volume Control / sndvol32.exe)
+  private mixerInitialized: boolean = false;
+  private vuAnimationId: number | null = null;
+  private vuRunning: boolean = false;
+  private visibleChannels: Set<string> = new Set(['master', 'wave', 'speech', 'cd', 'mic', 'pcspk']);
+  private currentMixerMode: 'playback' | 'recording' | 'all' = 'playback';
+
+  constructor() {
+    const savedVol = localStorage.getItem('llm95_virtio_sound_volume');
+    if (savedVol !== null) {
+      const parsed = parseInt(savedVol, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+        this.volume = parsed;
+        this.channels.master.volume = parsed;
+      }
+    }
+    const savedMute = localStorage.getItem('llm95_virtio_sound_muted');
+    if (savedMute !== null) {
+      this.isMuted = savedMute === 'true';
+      this.channels.master.muted = this.isMuted;
+    }
+
+    // Load saved channel states
+    const savedChannels = localStorage.getItem('llm95_audio_channels_v2');
+    if (savedChannels) {
+      try {
+        const parsed = JSON.parse(savedChannels);
+        Object.keys(parsed).forEach(k => {
+          if (this.channels[k]) {
+            this.channels[k].volume = parsed[k].volume ?? this.channels[k].volume;
+            this.channels[k].balance = parsed[k].balance ?? this.channels[k].balance;
+            this.channels[k].muted = parsed[k].muted ?? this.channels[k].muted;
+          }
+        });
+      } catch {}
+    }
+
+    // Load saved channel visibility
+    const savedVisible = localStorage.getItem('llm95_mixer_visible_channels');
+    if (savedVisible) {
+      try {
+        const arr = JSON.parse(savedVisible);
+        if (Array.isArray(arr) && arr.length > 0) {
+          this.visibleChannels = new Set(arr);
+        }
+      } catch {}
+    }
+  }
+
+  public getAudioContext(): AudioContext | null {
+    if (!this.audioCtx) {
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtxClass) {
+        try {
+          this.audioCtx = new AudioCtxClass({ sampleRate: 48000 });
+          this.masterGain = this.audioCtx.createGain();
+          this.applyGain();
+          this.masterGain.connect(this.audioCtx.destination);
+          this.initChannelNodes(this.audioCtx);
+          this.initMicAnalyser(this.audioCtx);
+        } catch (e) {
+          console.warn('[VirtIO-Sound] AudioContext init warning:', e);
+        }
+      }
+    }
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+    return this.audioCtx;
+  }
+
+  public ensureAudioInitialized(): void {
+    this.getAudioContext();
+  }
+
+  private initChannelNodes(ctx: AudioContext): void {
+    Object.keys(this.channels).forEach(id => {
+      if (id === 'master') return;
+      const ch = this.channels[id];
+      if (!ch.gainNode) {
+        ch.gainNode = ctx.createGain();
+        if (typeof ctx.createStereoPanner === 'function') {
+          ch.pannerNode = ctx.createStereoPanner();
+          ch.gainNode.connect(ch.pannerNode);
+          ch.pannerNode.connect(this.masterGain!);
+        } else {
+          ch.gainNode.connect(this.masterGain!);
+        }
+        this.applyChannelGain(id);
+      }
+    });
+  }
+
+  private initMicAnalyser(ctx: AudioContext): void {
+    if (this.micAnalyser) return;
+    try {
+      this.micAnalyser = ctx.createAnalyser();
+      this.micAnalyser.fftSize = 256;
+      this.micAnalyser.smoothingTimeConstant = 0.6;
+
+      this.micMonitorGain = ctx.createGain();
+      this.micMonitorGain.gain.setValueAtTime(this.micMonitor ? 0.7 : 0, ctx.currentTime);
+      this.micMonitorGain.connect(this.masterGain!);
+
+      const micCh = this.channels.mic;
+      if (micCh.gainNode) {
+        micCh.gainNode.connect(this.micAnalyser);
+        micCh.gainNode.connect(this.micMonitorGain);
+      }
+    } catch (e) {
+      console.warn('[VirtIO-Sound] Mic analyser setup warning:', e);
+    }
+  }
+
+  private applyGain(): void {
+    if (this.masterGain && this.audioCtx) {
+      const targetGain = this.isMuted ? 0 : (this.volume / 100);
+      try {
+        this.masterGain.gain.setValueAtTime(targetGain, this.audioCtx.currentTime);
+      } catch {
+        this.masterGain.gain.value = targetGain;
+      }
+    }
+  }
+
+  public applyChannelGain(id: string): void {
+    const ch = this.channels[id];
+    if (!ch) return;
+    if (id === 'master') {
+      this.volume = ch.volume;
+      this.isMuted = ch.muted;
+      this.applyGain();
+      return;
+    }
+    if (ch.gainNode && this.audioCtx) {
+      const targetGain = ch.muted ? 0 : (ch.volume / 100);
+      try {
+        ch.gainNode.gain.setValueAtTime(targetGain, this.audioCtx.currentTime);
+      } catch {
+        ch.gainNode.gain.value = targetGain;
+      }
+    }
+    if (ch.pannerNode && this.audioCtx) {
+      const targetPan = Math.max(-1, Math.min(1, ch.balance / 100));
+      try {
+        ch.pannerNode.pan.setValueAtTime(targetPan, this.audioCtx.currentTime);
+      } catch {
+        ch.pannerNode.pan.value = targetPan;
+      }
+    }
+  }
+
+  public setVolume(val: number, emitFeedback: boolean = false): void {
+    this.volume = Math.max(0, Math.min(100, Math.round(val)));
+    this.channels.master.volume = this.volume;
+    localStorage.setItem('llm95_virtio_sound_volume', this.volume.toString());
+    this.applyGain();
+    this.updateUI();
+    this.syncServer();
+
+    if (emitFeedback && !this.isMuted && this.volume > 0) {
+      this.playBeep(520, 0.08);
+    }
+  }
+
+  public getVolume(): number {
+    return this.volume;
+  }
+
+  public setMute(muted: boolean): void {
+    this.isMuted = muted;
+    this.channels.master.muted = muted;
+    localStorage.setItem('llm95_virtio_sound_muted', this.isMuted ? 'true' : 'false');
+    this.applyGain();
+    this.updateUI();
+    this.syncServer();
+
+    if (this.isMuted) {
+      this.triggerMuteVibration();
+    }
+  }
+
+  public triggerMuteVibration(): void {
+    const iconEl = document.getElementById('taskbar-volume-icon');
+    if (iconEl) {
+      iconEl.classList.remove('vibrate');
+      iconEl.classList.remove('muted-vibrate');
+      void iconEl.offsetWidth; // Force CSS reflow to replay vibration animation
+      iconEl.classList.add('vibrate');
+      setTimeout(() => {
+        iconEl.classList.remove('vibrate');
+      }, 500);
+    }
+  }
+
+  public toggleMute(): boolean {
+    this.setMute(!this.isMuted);
+    return this.isMuted;
+  }
+
+  public isMute(): boolean {
+    return this.isMuted;
+  }
+
+  public getChannel(id: string): AudioChannelState {
+    return this.channels[id] || this.channels.master;
+  }
+
+  public getAllChannels(): AudioChannelState[] {
+    return Object.values(this.channels);
+  }
+
+  public setChannelVolume(id: string, volume: number): void {
+    const ch = this.channels[id];
+    if (!ch) return;
+    ch.volume = Math.max(0, Math.min(100, Math.round(volume)));
+    if (id === 'master') {
+      this.setVolume(ch.volume, false);
+    } else {
+      this.applyChannelGain(id);
+    }
+    this.saveChannels();
+  }
+
+  public setChannelBalance(id: string, balance: number): void {
+    const ch = this.channels[id];
+    if (!ch) return;
+    ch.balance = Math.max(-100, Math.min(100, Math.round(balance)));
+    this.applyChannelGain(id);
+    this.saveChannels();
+  }
+
+  public setChannelMute(id: string, muted: boolean): void {
+    const ch = this.channels[id];
+    if (!ch) return;
+    ch.muted = muted;
+    if (id === 'master') {
+      this.setMute(muted);
+    } else {
+      this.applyChannelGain(id);
+    }
+    this.saveChannels();
+  }
+
+  private saveChannels(): void {
+    try {
+      const serialized: Record<string, any> = {};
+      Object.keys(this.channels).forEach(k => {
+        serialized[k] = {
+          volume: this.channels[k].volume,
+          balance: this.channels[k].balance,
+          muted: this.channels[k].muted
+        };
+      });
+      localStorage.setItem('llm95_audio_channels_v2', JSON.stringify(serialized));
+    } catch {}
+  }
+
+  // --- Microphone & Input Level VU Monitoring ---
+  public setMicBoost(boost: boolean): void {
+    this.micBoost = boost;
+  }
+
+  public getMicBoost(): boolean {
+    return this.micBoost;
+  }
+
+  public setMicMonitor(monitor: boolean): void {
+    this.micMonitor = monitor;
+    if (this.micMonitorGain && this.audioCtx) {
+      const target = monitor ? 0.7 : 0;
+      try {
+        this.micMonitorGain.gain.setValueAtTime(target, this.audioCtx.currentTime);
+      } catch {
+        this.micMonitorGain.gain.value = target;
+      }
+    }
+  }
+
+  public getMicMonitor(): boolean {
+    return this.micMonitor;
+  }
+
+  public getIsRealMic(): boolean {
+    return this.isRealMic;
+  }
+
+  public getIsSimActive(): boolean {
+    return this.micSimActive;
+  }
+
+  public toggleVirtualVoiceTest(): boolean {
+    const ctx = this.getAudioContext();
+    if (!ctx) return false;
+
+    if (this.micSimActive) {
+      this.stopVirtualVoiceTest();
+      return false;
+    }
+
+    this.micSimActive = true;
+    const now = ctx.currentTime;
+    this.micSimGain = ctx.createGain();
+    this.micSimGain.gain.setValueAtTime(0.18, now);
+
+    this.micSimOsc1 = ctx.createOscillator();
+    this.micSimOsc1.type = 'triangle';
+    this.micSimOsc1.frequency.setValueAtTime(280, now);
+
+    this.micSimOsc2 = ctx.createOscillator();
+    this.micSimOsc2.type = 'sine';
+    this.micSimOsc2.frequency.setValueAtTime(640, now);
+
+    this.micSimOsc1.connect(this.micSimGain);
+    this.micSimOsc2.connect(this.micSimGain);
+
+    if (this.micAnalyser) {
+      this.micSimGain.connect(this.micAnalyser);
+    }
+    if (this.micMonitorGain && this.micMonitor) {
+      this.micSimGain.connect(this.micMonitorGain);
+    }
+
+    this.micSimOsc1.start(now);
+    this.micSimOsc2.start(now);
+
+    const words = [
+      { f1: 320, f2: 700, d: 250 },
+      { f1: 220, f2: 500, d: 180 },
+      { f1: 380, f2: 850, d: 300 },
+      { f1: 260, f2: 600, d: 220 }
+    ];
+    let step = 0;
+    this.micSimInterval = window.setInterval(() => {
+      if (!this.micSimActive || !this.micSimOsc1 || !this.micSimOsc2 || !this.audioCtx) return;
+      const t = this.audioCtx.currentTime;
+      const w = words[step % words.length];
+      this.micSimOsc1.frequency.setValueAtTime(w.f1, t);
+      this.micSimOsc2.frequency.setValueAtTime(w.f2, t);
+      if (this.micSimGain) {
+        this.micSimGain.gain.setValueAtTime(0.02, t);
+        this.micSimGain.gain.exponentialRampToValueAtTime(0.24, t + 0.03);
+        this.micSimGain.gain.exponentialRampToValueAtTime(0.02, t + (w.d / 1000) * 0.85);
+      }
+      step++;
+    }, 380);
+
+    return true;
+  }
+
+  public stopVirtualVoiceTest(): void {
+    this.micSimActive = false;
+    if (this.micSimInterval) {
+      clearInterval(this.micSimInterval);
+      this.micSimInterval = null;
+    }
+    try {
+      this.micSimOsc1?.stop();
+      this.micSimOsc2?.stop();
+      this.micSimOsc1?.disconnect();
+      this.micSimOsc2?.disconnect();
+      this.micSimGain?.disconnect();
+    } catch {}
+    this.micSimOsc1 = null;
+    this.micSimOsc2 = null;
+    this.micSimGain = null;
+  }
+
+  public async enableRealMicrophone(): Promise<boolean> {
+    const ctx = this.getAudioContext();
+    if (!ctx) return false;
+
+    if (this.isRealMic) {
+      this.disableRealMicrophone();
+      return false;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.micStream = stream;
+      this.micSourceNode = ctx.createMediaStreamSource(stream);
+      if (this.micAnalyser) {
+        this.micSourceNode.connect(this.micAnalyser);
+      }
+      if (this.micMonitorGain) {
+        this.micSourceNode.connect(this.micMonitorGain);
+      }
+      this.isRealMic = true;
+      this.stopVirtualVoiceTest();
+      return true;
+    } catch (err) {
+      console.warn('[VirtIO-Sound] Real microphone access denied or unavailable:', err);
+      return false;
+    }
+  }
+
+  public disableRealMicrophone(): void {
+    if (this.micStream) {
+      this.micStream.getTracks().forEach(t => t.stop());
+      this.micStream = null;
+    }
+    try {
+      this.micSourceNode?.disconnect();
+    } catch {}
+    this.micSourceNode = null;
+    this.isRealMic = false;
+  }
+
+  public getMicLevel(): { db: number; normalized: number; isClipping: boolean } {
+    const micCh = this.channels.mic;
+    if (micCh.muted || this.isMuted) {
+      return { db: -96, normalized: 0, isClipping: false };
+    }
+
+    let rms = 0;
+    if (this.micAnalyser) {
+      const buffer = new Uint8Array(this.micAnalyser.frequencyBinCount);
+      this.micAnalyser.getByteFrequencyData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i++) {
+        sum += (buffer[i] / 255) ** 2;
+      }
+      rms = Math.sqrt(sum / buffer.length);
+    }
+
+    // If virtual ambient baseline:
+    if (!this.isRealMic && !this.micSimActive) {
+      this.micPhase += 0.08;
+      const subtleWobble = (Math.sin(this.micPhase) * 0.02) + (Math.sin(this.micPhase * 2.7) * 0.015) + 0.035;
+      rms = Math.max(rms, subtleWobble);
+    }
+
+    const boostMultiplier = this.micBoost ? 2.8 : 1.0;
+    const faderMultiplier = (micCh.volume / 100);
+    const amplified = rms * faderMultiplier * boostMultiplier * 3.4;
+
+    const db = amplified > 0.001 ? Math.min(2.0, 20 * Math.log10(amplified)) : -96;
+    const normalized = Math.max(0, Math.min(1, (db + 48) / 48));
+    const isClipping = db >= -0.5 || amplified >= 1.0;
+
+    return { db: Math.round(db * 10) / 10, normalized, isClipping };
+  }
+
+  public playChannelTone(channelId: string): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    if (channelId === 'master') {
+      this.playChime([523.25, 659.25, 783.99, 1046.50]);
+    } else if (channelId === 'wave') {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, now);
+      g.gain.setValueAtTime(0.001, now);
+      g.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+      osc.connect(g);
+      const dest = this.channels.wave.gainNode || this.masterGain!;
+      g.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.32);
+    } else if (channelId === 'speech') {
+      [880, 1320].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        g.gain.setValueAtTime(0.001, now + idx * 0.08);
+        g.gain.exponentialRampToValueAtTime(0.18, now + idx * 0.08 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.12);
+        osc.connect(g);
+        const dest = this.channels.speech.gainNode || this.masterGain!;
+        g.connect(dest);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.14);
+      });
+    } else if (channelId === 'cd') {
+      [261.63, 329.63, 392.00, 493.88].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+        g.gain.setValueAtTime(0.001, now + idx * 0.07);
+        g.gain.exponentialRampToValueAtTime(0.14, now + idx * 0.07 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.07 + 0.28);
+        osc.connect(g);
+        const dest = this.channels.cd.gainNode || this.masterGain!;
+        g.connect(dest);
+        osc.start(now + idx * 0.07);
+        osc.stop(now + idx * 0.07 + 0.3);
+      });
+    } else if (channelId === 'pcspk') {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(750, now);
+      g.gain.setValueAtTime(0.001, now);
+      g.gain.setValueAtTime(0.12, now + 0.005);
+      g.gain.setValueAtTime(0.0001, now + 0.12);
+      osc.connect(g);
+      const dest = this.channels.pcspk.gainNode || this.masterGain!;
+      g.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.13);
+    } else if (channelId === 'mic') {
+      this.toggleVirtualVoiceTest();
+    }
+  }
+
+  private syncServer(): void {
+    try {
+      fetch('/api/system/sound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: this.volume, muted: this.isMuted })
+      }).catch(() => {});
+    } catch {}
+  }
+
+  public updateUI(): void {
+    const iconEl = document.getElementById('taskbar-volume-icon');
+    const btnEl = document.getElementById('taskbar-volume-btn');
+    const sliderEl = document.getElementById('taskbar-volume-slider') as HTMLInputElement | null;
+    const readoutEl = document.getElementById('volume-percentage-label');
+    const muteCheckbox = document.getElementById('taskbar-volume-mute-checkbox') as HTMLInputElement | null;
+    const driverTabStatus = document.getElementById('driver-tab-volume-status');
+
+    let icon = '🔊';
+    if (this.isMuted) {
+      icon = '🔇';
+    } else if (this.volume === 0) {
+      icon = '🔈';
+    } else if (this.volume < 45) {
+      icon = '🔉';
+    } else {
+      icon = '🔊';
+    }
+
+    if (iconEl) iconEl.textContent = icon;
+    if (btnEl) {
+      btnEl.title = `VirtIO-Sound: ${this.isMuted ? 'MUTED' : this.volume + '%'} (macOS CoreAudio 48kHz Stereo) - Click to adjust`;
+    }
+    if (sliderEl && parseInt(sliderEl.value, 10) !== this.volume) {
+      sliderEl.value = this.volume.toString();
+    }
+    if (readoutEl) {
+      readoutEl.textContent = this.isMuted ? 'MUTED' : `${this.volume}%`;
+    }
+    if (muteCheckbox) {
+      muteCheckbox.checked = this.isMuted;
+    }
+    if (driverTabStatus) {
+      driverTabStatus.textContent = this.isMuted ? `MUTED (${this.volume}%)` : `${this.volume}% (Active)`;
+    }
+
+    // Sync all channel strips in Volume Control window if open
+    this.syncAllMixerControls();
+  }
+
+  public playBeep(freq: number = 440, duration: number = 0.08): void {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx || !this.masterGain || this.isMuted || this.volume === 0) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const noteGain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      noteGain.gain.setValueAtTime(0.001, now);
+      noteGain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(noteGain);
+      noteGain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    } catch (e) {
+      console.warn('[VirtIO-Sound] Beep error:', e);
+    }
+  }
+
+  public playChime(freqs: number[] = [523.25, 659.25, 783.99, 1046.50]): void {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx || !this.masterGain) return;
+      if (this.isMuted || this.volume === 0) {
+        console.log('[VirtIO-Sound] Audio is muted or volume 0. Chime suppressed.');
+        return;
+      }
+      const now = ctx.currentTime;
+      freqs.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const noteGain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now + idx * 0.1);
+        noteGain.gain.setValueAtTime(0.001, now + idx * 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(0.2, now + idx * 0.1 + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.1 + 0.35);
+        osc.connect(noteGain);
+        noteGain.connect(this.masterGain!);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.38);
+      });
+    } catch (e) {
+      console.warn('[VirtIO-Sound] Chime error:', e);
+    }
+  }
+
+  public initTrayUI(): void {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
+    const trayBtn = document.getElementById('taskbar-volume-btn');
+    const popup = document.getElementById('taskbar-volume-popup');
+    const closeBtn = document.getElementById('volume-popup-close');
+    const slider = document.getElementById('taskbar-volume-slider') as HTMLInputElement | null;
+    const muteCheckbox = document.getElementById('taskbar-volume-mute-checkbox') as HTMLInputElement | null;
+    const testBtn = document.getElementById('volume-test-sound-btn');
+    const openMixerBtn = document.getElementById('volume-popup-open-mixer');
+
+    this.updateUI();
+
+    // Toggle popup on single click
+    trayBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!popup) return;
+      const isVisible = popup.style.display !== 'none';
+      if (isVisible) {
+        popup.style.display = 'none';
+        trayBtn.classList.remove('active');
+      } else {
+        popup.style.display = 'block';
+        trayBtn.classList.add('active');
+        this.updateUI();
+      }
+    });
+
+    // Double click tray icon opens Volume Control mixer window!
+    trayBtn?.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (popup) popup.style.display = 'none';
+      trayBtn.classList.remove('active');
+      openApp('volumeControl');
+    });
+
+    openMixerBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (popup) popup.style.display = 'none';
+      trayBtn?.classList.remove('active');
+      openApp('volumeControl');
+    });
+
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (popup) popup.style.display = 'none';
+      trayBtn?.classList.remove('active');
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      if (popup && popup.style.display !== 'none') {
+        const target = e.target as Node;
+        if (!popup.contains(target) && !trayBtn?.contains(target)) {
+          popup.style.display = 'none';
+          trayBtn?.classList.remove('active');
+        }
+      }
+    });
+
+    // Volume Slider input
+    slider?.addEventListener('input', () => {
+      const val = parseInt(slider.value, 10);
+      if (!isNaN(val)) {
+        this.setVolume(val, false);
+      }
+    });
+
+    // Volume Slider change (audible feedback)
+    slider?.addEventListener('change', () => {
+      const val = parseInt(slider.value, 10);
+      if (!isNaN(val)) {
+        this.setVolume(val, true);
+      }
+    });
+
+    // Mute toggle
+    muteCheckbox?.addEventListener('change', () => {
+      this.setMute(muteCheckbox.checked);
+      if (muteCheckbox.checked) {
+        this.triggerMuteVibration();
+      }
+    });
+
+    // Test button
+    testBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.playChime([440, 554.37, 659.25, 880]);
+    });
+  }
+
+  // --- Advanced System Sound Mixer: Volume Control (sndvol32.exe) ---
+
+  public startVuMeter(): void {
+    if (this.vuRunning) return;
+    this.vuRunning = true;
+
+    const ledContainer = document.getElementById('vu-meter-leds');
+    const leds = ledContainer ? Array.from(ledContainer.querySelectorAll<HTMLElement>('.vu-led-segment')) : [];
+    const readout = document.getElementById('vu-numeric-readout');
+    const statusDevice = document.getElementById('mixer-status-device');
+
+    const updateFrame = () => {
+      if (!this.vuRunning) return;
+
+      const level = this.getMicLevel();
+      const activeCount = Math.round(level.normalized * 12);
+
+      leds.forEach(led => {
+        const segLevel = parseInt(led.dataset.level || '0', 10);
+        if (segLevel <= activeCount) {
+          led.classList.add('active');
+        } else {
+          led.classList.remove('active');
+        }
+      });
+
+      if (readout) {
+        if (level.db <= -90) {
+          readout.textContent = '-inf dBFS';
+          readout.style.color = '#333333';
+        } else {
+          readout.textContent = `${level.db.toFixed(1)} dBFS`;
+          if (level.isClipping) {
+            readout.style.color = '#FF0000';
+          } else if (level.normalized > 0.7) {
+            readout.style.color = '#B8860B';
+          } else {
+            readout.style.color = '#006600';
+          }
+        }
+      }
+
+      if (statusDevice) {
+        const micSourceText = this.isRealMic ? 'Hardware Mic (Active)' : (this.micSimActive ? 'Virtual Speech Tone' : 'VirtIO-Sound CoreAudio (48kHz)');
+        statusDevice.textContent = `● Device: ${micSourceText} | VU: ${level.db > -90 ? level.db.toFixed(1) + ' dBFS' : '-inf'}`;
+      }
+
+      this.vuAnimationId = requestAnimationFrame(updateFrame);
+    };
+
+    this.vuAnimationId = requestAnimationFrame(updateFrame);
+  }
+
+  public pauseVuMeter(): void {
+    this.vuRunning = false;
+    if (this.vuAnimationId !== null) {
+      cancelAnimationFrame(this.vuAnimationId);
+      this.vuAnimationId = null;
+    }
+  }
+
+  public setMixerMode(mode: 'playback' | 'recording' | 'all'): void {
+    this.currentMixerMode = mode;
+
+    const btnPlayback = document.getElementById('btn-mixer-tab-playback');
+    const btnRecording = document.getElementById('btn-mixer-tab-recording');
+    btnPlayback?.classList.toggle('active', mode === 'playback');
+    btnRecording?.classList.toggle('active', mode === 'recording');
+
+    const menuPlayback = document.getElementById('mixer-mode-playback');
+    const menuRecording = document.getElementById('mixer-mode-recording');
+    const menuAll = document.getElementById('mixer-mode-all');
+    if (menuPlayback) menuPlayback.textContent = (mode === 'playback' ? '✓ ' : '   ') + 'Playback Controls';
+    if (menuRecording) menuRecording.textContent = (mode === 'recording' ? '✓ ' : '   ') + 'Recording Controls';
+    if (menuAll) menuAll.textContent = (mode === 'all' ? '✓ ' : '   ') + 'Show All Channels';
+
+    const strips = document.querySelectorAll<HTMLElement>('.mixer-channel-strip');
+    strips.forEach(strip => {
+      const chId = strip.dataset.channel;
+      if (!chId) return;
+
+      if (!this.visibleChannels.has(chId)) {
+        strip.style.display = 'none';
+        return;
+      }
+
+      if (mode === 'playback') {
+        if (chId === 'mic') {
+          strip.style.opacity = '0.55';
+          strip.style.display = 'flex';
+        } else {
+          strip.style.opacity = '1';
+          strip.style.display = 'flex';
+        }
+      } else if (mode === 'recording') {
+        if (chId === 'mic' || chId === 'master') {
+          strip.style.opacity = '1';
+          strip.style.display = 'flex';
+          if (chId === 'mic') {
+            strip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        } else {
+          strip.style.opacity = '0.45';
+          strip.style.display = 'flex';
+        }
+      } else {
+        strip.style.opacity = '1';
+        strip.style.display = 'flex';
+      }
+    });
+  }
+
+  public initMixerWindow(_windowEl?: HTMLElement): void {
+    this.ensureAudioInitialized();
+    this.startVuMeter();
+
+    if (this.mixerInitialized) {
+      this.syncAllMixerControls();
+      return;
+    }
+    this.mixerInitialized = true;
+
+    // Apply saved channel visibility
+    ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'].forEach(id => {
+      const strip = document.getElementById(`channel-strip-${id}`);
+      const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+      const isVisible = this.visibleChannels.has(id);
+      if (strip) strip.style.display = isVisible ? 'flex' : 'none';
+      if (toggle) toggle.checked = isVisible;
+    });
+    this.updateActiveChannelsCount();
+
+    // Wire up all channel strips (faders, pan sliders, mutes, test buttons)
+    const channelIds = ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'];
+    channelIds.forEach(id => {
+      const fader = document.getElementById(`mixer-fader-${id}`) as HTMLInputElement | null;
+      const balance = document.getElementById(`mixer-balance-${id}`) as HTMLInputElement | null;
+      const muteBox = document.getElementById(`mixer-mute-${id}`) as HTMLInputElement | null;
+      const testBtn = document.getElementById(`mixer-test-${id}`);
+      const strip = document.getElementById(`channel-strip-${id}`);
+
+      // Fader listener
+      if (fader) {
+        fader.addEventListener('input', () => {
+          const val = parseInt(fader.value, 10);
+          if (isNaN(val)) return;
+          if (id === 'master') {
+            this.setVolume(val, false);
+          } else {
+            this.setChannelVolume(id, val);
+          }
+          this.updateMixerDbLabel(id, val);
+        });
+
+        fader.addEventListener('change', () => {
+          const val = parseInt(fader.value, 10);
+          if (isNaN(val)) return;
+          if (id === 'master') {
+            this.setVolume(val, true);
+          } else {
+            this.setChannelVolume(id, val);
+            this.playChannelTone(id);
+          }
+        });
+      }
+
+      // Balance listener
+      if (balance) {
+        balance.addEventListener('input', () => {
+          const bal = parseInt(balance.value, 10);
+          if (isNaN(bal)) return;
+          this.setChannelBalance(id, bal);
+          this.updateMixerPanLabel(id, bal);
+        });
+
+        balance.addEventListener('dblclick', () => {
+          balance.value = '0';
+          this.setChannelBalance(id, 0);
+          this.updateMixerPanLabel(id, 0);
+        });
+      }
+
+      // Mute listener
+      if (muteBox) {
+        muteBox.addEventListener('change', () => {
+          const muted = muteBox.checked;
+          if (strip) strip.classList.toggle('muted-strip', muted);
+          if (id === 'master') {
+            this.setMute(muted);
+          } else {
+            this.setChannelMute(id, muted);
+          }
+        });
+      }
+
+      // Test Tone listener
+      if (testBtn) {
+        testBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.playChannelTone(id);
+        });
+      }
+    });
+
+    // Virtual Mic specific controls
+    const micBoostBox = document.getElementById('mixer-boost-mic') as HTMLInputElement | null;
+    const micMonitorBox = document.getElementById('mixer-monitor-mic') as HTMLInputElement | null;
+    const micToggleVoiceBtn = document.getElementById('mixer-toggle-mic-source');
+    const micRealBtn = document.getElementById('mixer-real-mic-btn');
+
+    if (micBoostBox) {
+      micBoostBox.checked = this.micBoost;
+      micBoostBox.addEventListener('change', () => {
+        this.setMicBoost(micBoostBox.checked);
+        const micFader = document.getElementById('mixer-fader-mic') as HTMLInputElement | null;
+        if (micFader) this.updateMixerDbLabel('mic', parseInt(micFader.value, 10) || 75);
+      });
+    }
+
+    if (micMonitorBox) {
+      micMonitorBox.checked = this.micMonitor;
+      micMonitorBox.addEventListener('change', () => {
+        this.setMicMonitor(micMonitorBox.checked);
+      });
+    }
+
+    if (micToggleVoiceBtn) {
+      micToggleVoiceBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const active = this.toggleVirtualVoiceTest();
+        if (active) {
+          micToggleVoiceBtn.textContent = '⏹️ Stop Voice';
+          micToggleVoiceBtn.classList.add('active');
+        } else {
+          micToggleVoiceBtn.textContent = '🎙️ Test Voice';
+          micToggleVoiceBtn.classList.remove('active');
+        }
+      });
+    }
+
+    if (micRealBtn) {
+      micRealBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        micRealBtn.textContent = '⌛ ...';
+        const enabled = await this.enableRealMicrophone();
+        if (enabled) {
+          micRealBtn.textContent = '🟢 Real On';
+          micRealBtn.classList.add('active');
+          micRealBtn.title = 'Real Microphone active. Click to disconnect.';
+        } else {
+          micRealBtn.textContent = '🔴 Real';
+          micRealBtn.classList.remove('active');
+          micRealBtn.title = 'Use Real Microphone Hardware';
+        }
+      });
+    }
+
+    // Toolbar buttons
+    const btnPlayback = document.getElementById('btn-mixer-tab-playback');
+    const btnRecording = document.getElementById('btn-mixer-tab-recording');
+    const btnDevices = document.getElementById('btn-mixer-tab-devices');
+    const btnTestAll = document.getElementById('btn-mixer-test-all');
+    const btnMuteAll = document.getElementById('btn-mixer-mute-all');
+
+    btnPlayback?.addEventListener('click', () => this.setMixerMode('playback'));
+    btnRecording?.addEventListener('click', () => this.setMixerMode('recording'));
+    btnDevices?.addEventListener('click', () => this.openPropertiesPanel());
+
+    btnTestAll?.addEventListener('click', () => {
+      this.playChime([523.25, 659.25, 783.99, 1046.50]);
+    });
+
+    btnMuteAll?.addEventListener('click', () => {
+      const anyUnmuted = this.getAllChannels().some(c => !c.muted) || !this.isMuted;
+      const targetMute = anyUnmuted;
+      channelIds.forEach(id => {
+        const mBox = document.getElementById(`mixer-mute-${id}`) as HTMLInputElement | null;
+        if (mBox) mBox.checked = targetMute;
+        const strip = document.getElementById(`channel-strip-${id}`);
+        if (strip) strip.classList.toggle('muted-strip', targetMute);
+        if (id === 'master') {
+          this.setMute(targetMute);
+        } else {
+          this.setChannelMute(id, targetMute);
+        }
+      });
+      if (btnMuteAll) {
+        btnMuteAll.textContent = targetMute ? '🔊 Unmute All' : '🔇 Mute All';
+        btnMuteAll.style.color = targetMute ? '#006600' : '#800000';
+      }
+    });
+
+    // Menus
+    this.initMixerMenus();
+
+    // Properties Modal Panel
+    this.initPropertiesModal();
+
+    // Dialog Buttons (About and Help)
+    this.initDialogButtons();
+
+    // Initial sync
+    this.syncAllMixerControls();
+  }
+
+  private updateMixerDbLabel(id: string, val: number): void {
+    const badge = document.getElementById(`mixer-db-${id}`);
+    if (!badge) return;
+    if (id === 'mic') {
+      const gainDb = val > 0 ? (((val - 50) / 50) * 12).toFixed(1) : '-inf';
+      const sign = val >= 50 ? '+' : '';
+      const boostText = this.micBoost ? ' (+20dB boost)' : '';
+      badge.textContent = `${val}% (${sign}${gainDb} dB${boostText})`;
+    } else {
+      const db = val > 0 ? (20 * Math.log10(val / 100)).toFixed(1) : '-inf';
+      badge.textContent = `${val}% (${db} dB)`;
+    }
+  }
+
+  private updateMixerPanLabel(id: string, bal: number): void {
+    const readout = document.getElementById(`mixer-pan-readout-${id}`);
+    if (!readout) return;
+    if (bal === 0) {
+      readout.textContent = 'Center';
+    } else if (bal < 0) {
+      readout.textContent = `◄ ${Math.abs(bal)}% L`;
+    } else {
+      readout.textContent = `${bal}% R ►`;
+    }
+  }
+
+  public syncAllMixerControls(): void {
+    ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'].forEach(id => {
+      const ch = id === 'master'
+        ? { volume: this.volume, balance: 0, muted: this.isMuted }
+        : (this.channels[id] || { volume: 75, balance: 0, muted: false });
+
+      const fader = document.getElementById(`mixer-fader-${id}`) as HTMLInputElement | null;
+      const bal = document.getElementById(`mixer-balance-${id}`) as HTMLInputElement | null;
+      const mute = document.getElementById(`mixer-mute-${id}`) as HTMLInputElement | null;
+      const strip = document.getElementById(`channel-strip-${id}`);
+
+      if (fader && parseInt(fader.value, 10) !== ch.volume) {
+        fader.value = ch.volume.toString();
+      }
+      this.updateMixerDbLabel(id, ch.volume);
+
+      if (bal && parseInt(bal.value, 10) !== ch.balance) {
+        bal.value = ch.balance.toString();
+      }
+      this.updateMixerPanLabel(id, ch.balance);
+
+      if (mute) {
+        mute.checked = ch.muted;
+      }
+      if (strip) {
+        strip.classList.toggle('muted-strip', ch.muted);
+      }
+    });
+  }
+
+  private updateActiveChannelsCount(): void {
+    const channelsSpan = document.getElementById('mixer-status-channels');
+    if (channelsSpan) {
+      channelsSpan.textContent = `Channels Active: ${this.visibleChannels.size}/6`;
+    }
+  }
+
+  public openPropertiesPanel(): void {
+    const panel = document.getElementById('mixer-properties-panel');
+    if (!panel) return;
+    panel.style.display = 'block';
+
+    ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'].forEach(id => {
+      const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+      if (toggle) toggle.checked = this.visibleChannels.has(id);
+    });
+  }
+
+  public closePropertiesPanel(): void {
+    const panel = document.getElementById('mixer-properties-panel');
+    if (panel) panel.style.display = 'none';
+  }
+
+  private initPropertiesModal(): void {
+    const okBtn = document.getElementById('btn-properties-ok');
+    const cancelBtn = document.getElementById('btn-properties-cancel');
+    const radioPlayback = document.getElementById('radio-mode-playback');
+    const radioRecording = document.getElementById('radio-mode-recording');
+    const radioOther = document.getElementById('radio-mode-other');
+
+    radioPlayback?.addEventListener('change', () => {
+      ['master', 'wave', 'speech', 'cd', 'pcspk'].forEach(id => {
+        const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+        if (toggle) toggle.checked = true;
+      });
+      const micToggle = document.getElementById('toggle-chan-mic') as HTMLInputElement | null;
+      if (micToggle) micToggle.checked = false;
+    });
+
+    radioRecording?.addEventListener('change', () => {
+      ['wave', 'speech', 'cd', 'pcspk'].forEach(id => {
+        const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+        if (toggle) toggle.checked = false;
+      });
+      const masterToggle = document.getElementById('toggle-chan-master') as HTMLInputElement | null;
+      const micToggle = document.getElementById('toggle-chan-mic') as HTMLInputElement | null;
+      if (masterToggle) masterToggle.checked = true;
+      if (micToggle) micToggle.checked = true;
+    });
+
+    radioOther?.addEventListener('change', () => {
+      ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'].forEach(id => {
+        const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+        if (toggle) toggle.checked = true;
+      });
+    });
+
+    okBtn?.addEventListener('click', () => {
+      const channelIds = ['master', 'wave', 'speech', 'cd', 'mic', 'pcspk'];
+      channelIds.forEach(id => {
+        const toggle = document.getElementById(`toggle-chan-${id}`) as HTMLInputElement | null;
+        const strip = document.getElementById(`channel-strip-${id}`);
+        const isChecked = toggle ? toggle.checked : true;
+        if (isChecked) {
+          this.visibleChannels.add(id);
+          if (strip) strip.style.display = 'flex';
+        } else {
+          this.visibleChannels.delete(id);
+          if (strip) strip.style.display = 'none';
+        }
+      });
+      this.updateActiveChannelsCount();
+      localStorage.setItem('llm95_mixer_visible_channels', JSON.stringify([...this.visibleChannels]));
+      this.closePropertiesPanel();
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+      this.closePropertiesPanel();
+    });
+  }
+
+  private initDialogButtons(): void {
+    const aboutDialog = document.getElementById('mixer-about-dialog');
+    const helpDialog = document.getElementById('mixer-help-dialog');
+
+    document.getElementById('mixer-about-ok')?.addEventListener('click', () => {
+      if (aboutDialog) aboutDialog.style.display = 'none';
+    });
+    document.getElementById('mixer-about-close')?.addEventListener('click', () => {
+      if (aboutDialog) aboutDialog.style.display = 'none';
+    });
+
+    document.getElementById('mixer-help-ok')?.addEventListener('click', () => {
+      if (helpDialog) helpDialog.style.display = 'none';
+    });
+    document.getElementById('mixer-help-close')?.addEventListener('click', () => {
+      if (helpDialog) helpDialog.style.display = 'none';
+    });
+  }
+
+  private initMixerMenus(): void {
+    const menuOptions = document.getElementById('mixer-menu-options');
+    const menuMode = document.getElementById('mixer-menu-mode');
+    const menuHelp = document.getElementById('mixer-menu-help');
+
+    const dropdownOptions = document.getElementById('mixer-dropdown-options');
+    const dropdownMode = document.getElementById('mixer-dropdown-mode');
+    const dropdownHelp = document.getElementById('mixer-dropdown-help');
+
+    const closeAllDropdowns = () => {
+      if (dropdownOptions) dropdownOptions.style.display = 'none';
+      if (dropdownMode) dropdownMode.style.display = 'none';
+      if (dropdownHelp) dropdownHelp.style.display = 'none';
+    };
+
+    menuOptions?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = dropdownOptions?.style.display === 'block';
+      closeAllDropdowns();
+      if (!open && dropdownOptions) dropdownOptions.style.display = 'block';
+    });
+
+    menuMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = dropdownMode?.style.display === 'block';
+      closeAllDropdowns();
+      if (!open && dropdownMode) dropdownMode.style.display = 'block';
+    });
+
+    menuHelp?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = dropdownHelp?.style.display === 'block';
+      closeAllDropdowns();
+      if (!open && dropdownHelp) dropdownHelp.style.display = 'block';
+    });
+
+    document.addEventListener('click', () => closeAllDropdowns());
+
+    // Menu Item Actions
+    document.getElementById('mixer-opt-properties')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      this.openPropertiesPanel();
+    });
+
+    document.getElementById('mixer-opt-advanced')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      const badges = document.querySelectorAll('.volume-db-badge');
+      badges.forEach(b => {
+        (b as HTMLElement).style.display = (b as HTMLElement).style.display === 'none' ? 'block' : 'none';
+      });
+    });
+
+    document.getElementById('mixer-opt-exit')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      closeApp('volumeControl');
+    });
+
+    document.getElementById('mixer-mode-playback')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      this.setMixerMode('playback');
+    });
+
+    document.getElementById('mixer-mode-recording')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      this.setMixerMode('recording');
+    });
+
+    document.getElementById('mixer-mode-all')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      this.setMixerMode('all');
+    });
+
+    document.getElementById('mixer-help-topics')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      const helpDialog = document.getElementById('mixer-help-dialog');
+      if (helpDialog) helpDialog.style.display = 'flex';
+    });
+
+    document.getElementById('mixer-help-about')?.addEventListener('click', () => {
+      closeAllDropdowns();
+      const aboutDialog = document.getElementById('mixer-about-dialog');
+      if (aboutDialog) aboutDialog.style.display = 'flex';
+    });
+  }
+}
+
+const virtIOSound = new VirtIOSoundController();
 
 // --- Autonomous Computer Controller (OS Pilot Engine) ---
 // Allows the embedded LLM and chat interface to operate everything on the computer
@@ -319,28 +2132,38 @@ const OSController = {
     if (cell) cell.click();
   },
   playTestSound(): void {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const now = ctx.currentTime;
-        const freqs = [440, 659.25, 880];
-        freqs.forEach((f, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, now + idx * 0.12);
-          gain.gain.setValueAtTime(0.15, now + idx * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now + idx * 0.12);
-          osc.stop(now + idx * 0.12 + 0.4);
-        });
-      }
-    } catch (e) {
-      console.warn('AudioContext error:', e);
-    }
+    virtIOSound.playChime([440, 554.37, 659.25, 880]);
+  },
+  setMasterVolume(percent: number): void {
+    virtIOSound.setVolume(percent, true);
+  },
+  toggleMute(): boolean {
+    return virtIOSound.toggleMute();
+  },
+  getSoundStatus(): { volume: number; isMuted: boolean } {
+    return { volume: virtIOSound.getVolume(), isMuted: virtIOSound.isMute() };
+  },
+  openVolumeControl(): void {
+    openApp('volumeControl');
+  },
+  setChannelVolume(channelId: string, volume: number): void {
+    virtIOSound.setChannelVolume(channelId, volume);
+  },
+  toggleChannelMute(channelId: string): boolean {
+    const ch = virtIOSound.getChannel(channelId);
+    const newMuted = !ch.muted;
+    virtIOSound.setChannelMute(channelId, newMuted);
+    return newMuted;
+  },
+  openHypervisor(): void {
+    openApp('hypervisorWindow');
+  },
+  openVm(): void {
+    openApp('v86Window');
+  },
+  async scrubRam(): Promise<void> {
+    const vm = getV86Instance();
+    if (vm) await vm.getHypervisor().scrubAndZeroRam();
   }
 };
 
@@ -373,8 +2196,9 @@ function bringToFront(windowElement: HTMLDivElement): void {
   }
 }
 
-async function openApp(appName: string): Promise<void> {
-  const windowElement = document.getElementById(appName) as HTMLDivElement | null;
+async function openApp(appName: string, options?: { tab?: string }): Promise<void> {
+  const targetId = appName === 'hypervisorWindow' ? 'v86Window' : appName;
+  const windowElement = document.getElementById(targetId) as HTMLDivElement | null;
   if (!windowElement) {
     console.error(`Window element not found for app: ${appName}`);
     return;
@@ -457,6 +2281,22 @@ async function openApp(appName: string): Promise<void> {
         iconSrc = 'https://storage.googleapis.com/gemini-95-icons/ytmediaplayer.png';
         title = 'GemPlayer';
         break;
+      case 'volumeControl':
+        iconSrc = 'https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png';
+        title = 'Volume Control';
+        break;
+      case 'v86Window':
+        iconSrc = 'https://win98icons.alexmeub.com/icons/png/computer_explorer_cool-0.png';
+        title = 'x86 Virtual Machine';
+        break;
+      case 'hypervisorWindow':
+        iconSrc = 'https://win98icons.alexmeub.com/icons/png/key_win-0.png';
+        title = 'RAM Hypervisor';
+        break;
+      case 'firewallWindow':
+        iconSrc = 'https://win98icons.alexmeub.com/icons/png/trust0-0.png';
+        title = 'Firewall';
+        break;
     }
   }
 
@@ -514,6 +2354,12 @@ async function openApp(appName: string): Promise<void> {
     initMyComputer(windowElement);
   } else if (appName === 'mediaPlayer') {
     await initMediaPlayer(windowElement);
+  } else if (appName === 'volumeControl') {
+    virtIOSound.initMixerWindow(windowElement);
+  } else if (appName === 'v86Window' || appName === 'hypervisorWindow') {
+    await initV86Window(windowElement, appName === 'hypervisorWindow' || options?.tab === 'hypervisor');
+  } else if (appName === 'firewallWindow') {
+    firewallController.init(windowElement);
   }
 }
 
@@ -526,6 +2372,10 @@ function closeApp(appName: string): void {
   windowEl.classList.remove('active');
   taskbarButton.remove();
   openApps.delete(appName);
+
+  if (appName === 'volumeControl') {
+    virtIOSound.pauseVuMeter();
+  }
 
   if (appName === 'llamaEngine' && engineMonitorIntervalId) {
     clearInterval(engineMonitorIntervalId);
@@ -644,8 +2494,29 @@ function initTerminalWindow(windowElement: HTMLDivElement): void {
     inputEl.value = '';
     inputEl.focus();
 
-    if (trimmed.toLowerCase() === 'sound-test') {
+    const lowerCmd = trimmed.toLowerCase();
+    const cmdTokens = lowerCmd.split(/\s+/);
+    if (lowerCmd === 'sound-test') {
       OSController.playTestSound();
+    } else if (cmdTokens[0] === 'volume') {
+      if (cmdTokens[1]) {
+        const v = parseInt(cmdTokens[1], 10);
+        if (!isNaN(v)) virtIOSound.setVolume(v, true);
+      }
+    } else if (lowerCmd === 'mute') {
+      virtIOSound.setMute(true);
+    } else if (lowerCmd === 'unmute') {
+      virtIOSound.setMute(false);
+    } else if (lowerCmd === 'sndvol32' || lowerCmd === 'mixer' || lowerCmd === 'volume-control') {
+      openApp('volumeControl');
+    } else if (lowerCmd.startsWith('hypervisor') || lowerCmd === 'vm' || lowerCmd === 'v86' || lowerCmd.includes('ram-shield')) {
+      if (lowerCmd.includes('scrub')) {
+        const vm = getV86Instance();
+        if (vm) {
+          vm.getHypervisor().scrubAndZeroRam();
+        }
+      }
+      openApp('hypervisorWindow');
     }
   }
 
@@ -862,6 +2733,39 @@ function initLlamaEngine(windowElement: HTMLDivElement): void {
   const customModelInput = windowElement.querySelector('#custom-model-input') as HTMLInputElement;
   const btnApplyModel = windowElement.querySelector('#btn-apply-model-path') as HTMLButtonElement;
 
+  // Model Registry UI Elements
+  const regBootCount = windowElement.querySelector('#reg-boot-count') as HTMLElement | null;
+  const regLastUpdated = windowElement.querySelector('#reg-last-updated') as HTMLElement | null;
+  const regAutoreloadChk = windowElement.querySelector('#reg-autoreload-chk') as HTMLInputElement | null;
+  const btnReloadFromRegistry = windowElement.querySelector('#btn-reload-from-registry') as HTMLButtonElement | null;
+  const btnToggleViewRegistry = windowElement.querySelector('#btn-toggle-view-registry') as HTMLButtonElement | null;
+  const btnRelaunchWizardTab = windowElement.querySelector('#btn-relaunch-wizard-tab') as HTMLButtonElement | null;
+  const registryJsonDisplay = windowElement.querySelector('#registry-json-display') as HTMLElement | null;
+
+  async function loadRegistryStatus() {
+    try {
+      const res = await fetch('/api/model-registry');
+      if (res.ok) {
+        const data = await res.json();
+        const reg = data.registry;
+        if (reg) {
+          if (regBootCount) regBootCount.textContent = `Boot #${reg.bootCount || 1}`;
+          if (regLastUpdated) {
+            regLastUpdated.textContent = reg.lastSelectedTimestamp ? new Date(reg.lastSelectedTimestamp).toLocaleString() : 'Just now';
+          }
+          if (regAutoreloadChk) {
+            regAutoreloadChk.checked = reg.autoReloadOnBoot !== false;
+          }
+          if (registryJsonDisplay) {
+            registryJsonDisplay.textContent = JSON.stringify(reg, null, 2);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed loading registry status:', e);
+    }
+  }
+
   async function loadModels() {
     try {
       const res = await fetch('/api/models');
@@ -883,12 +2787,16 @@ function initLlamaEngine(windowElement: HTMLDivElement): void {
               activeModelName = m.name;
               if (activeModelLabel) activeModelLabel.textContent = m.name;
               if (customModelInput) customModelInput.value = `/models/${m.name}`;
+              updateTaskbarStatus(m.name);
+              localStorage.setItem('llm95_selected_model', m.name);
+              localStorage.setItem('llm95_selected_model_id', m.id);
               await fetch('/api/models/select', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ modelId: m.id, modelName: m.name })
               });
               loadModels();
+              loadRegistryStatus();
               pollHealth();
             });
             modelTableBody.appendChild(tr);
@@ -900,14 +2808,69 @@ function initLlamaEngine(windowElement: HTMLDivElement): void {
     }
   }
   loadModels();
+  loadRegistryStatus();
 
-  btnApplyModel?.addEventListener('click', () => {
+  regAutoreloadChk?.addEventListener('change', async () => {
+    const isChecked = regAutoreloadChk.checked;
+    localStorage.setItem('llm95_autoreload_on_boot', isChecked ? 'true' : 'false');
+    await fetch('/api/model-registry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autoReloadOnBoot: isChecked })
+    });
+    loadRegistryStatus();
+  });
+
+  btnReloadFromRegistry?.addEventListener('click', async () => {
+    btnReloadFromRegistry.disabled = true;
+    btnReloadFromRegistry.textContent = 'Reloading...';
+    try {
+      const res = await fetch('/api/model-registry/reload', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reloadedModel) {
+          activeModelName = data.reloadedModel;
+          if (activeModelLabel) activeModelLabel.textContent = data.reloadedModel;
+          updateTaskbarStatus(data.reloadedModel);
+          localStorage.setItem('llm95_selected_model', data.reloadedModel);
+          loadModels();
+          loadRegistryStatus();
+          pollHealth();
+        }
+      }
+    } finally {
+      btnReloadFromRegistry.disabled = false;
+      btnReloadFromRegistry.textContent = '🔄 Reload from Registry';
+    }
+  });
+
+  btnToggleViewRegistry?.addEventListener('click', () => {
+    if (!registryJsonDisplay) return;
+    const isHidden = registryJsonDisplay.style.display === 'none';
+    registryJsonDisplay.style.display = isHidden ? 'block' : 'none';
+    btnToggleViewRegistry.textContent = isHidden ? '📄 Hide model-registry.json' : '📄 View model-registry.json';
+    if (isHidden) loadRegistryStatus();
+  });
+
+  btnRelaunchWizardTab?.addEventListener('click', () => {
+    openApp('setupWizard');
+  });
+
+  btnApplyModel?.addEventListener('click', async () => {
     const pathVal = customModelInput.value.trim();
     if (pathVal) {
       activeModelName = pathVal.split('/').pop() || pathVal;
       if (activeModelLabel) activeModelLabel.textContent = activeModelName;
+      updateTaskbarStatus(activeModelName);
+      localStorage.setItem('llm95_selected_model', activeModelName);
+      await fetch('/api/models/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelName: activeModelName, modelId: activeModelName })
+      });
+      loadModels();
+      loadRegistryStatus();
       pollHealth();
-      alert(`Model path updated to: ${pathVal}`);
     }
   });
 
@@ -947,23 +2910,85 @@ function initLlamaEngine(windowElement: HTMLDivElement): void {
     btnBenchmark.disabled = false;
   });
 
-  // VM Tab Actions
-  const btnCopyQemu = windowElement.querySelector('#btn-copy-qemu') as HTMLButtonElement;
-  const btnCopyPodman = windowElement.querySelector('#btn-copy-podman') as HTMLButtonElement;
-  const btnViewReadme = windowElement.querySelector('#btn-view-readme') as HTMLButtonElement;
+  // VM Tab Actions & Bootloader Inspectors
+  const btnCopyQemu = windowElement.querySelector('#btn-copy-qemu') as HTMLButtonElement | null;
+  const btnCopyPodman = windowElement.querySelector('#btn-copy-podman') as HTMLButtonElement | null;
+  const btnCopyUtm = windowElement.querySelector('#btn-copy-utm') as HTMLButtonElement | null;
+  const btnViewReadme = windowElement.querySelector('#btn-view-readme') as HTMLButtonElement | null;
+  const btnViewGrub = windowElement.querySelector('#btn-view-grub') as HTMLButtonElement | null;
+  const btnViewInit = windowElement.querySelector('#btn-view-init') as HTMLButtonElement | null;
+  const btnViewQemuScript = windowElement.querySelector('#btn-view-qemu-script') as HTMLButtonElement | null;
+  const btnBundleVm = windowElement.querySelector('#btn-bundle-vm') as HTMLButtonElement | null;
+  const vmInspectViewer = windowElement.querySelector('#vm-inspect-viewer') as HTMLElement | null;
+
+  async function loadBootFile(fileName: string, title: string): Promise<void> {
+    if (vmInspectViewer) vmInspectViewer.textContent = `[Loading ${fileName} from sealed appliance storage...]`;
+    try {
+      const res = await fetch('/api/vm/boot-files');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && data.files[fileName]) {
+          if (vmInspectViewer) {
+            vmInspectViewer.textContent = `=== [${title}] (${fileName}) ===\n\n${data.files[fileName]}`;
+          }
+          return;
+        }
+      }
+    } catch {}
+    if (vmInspectViewer) {
+      vmInspectViewer.textContent = `=== [${title}] ===\nFile loaded from kernel storage: /boot/${fileName}`;
+    }
+  }
+
+  btnViewGrub?.addEventListener('click', () => {
+    loadBootFile('grub.cfg', 'GRUB 2 Bootloader Configuration (UEFI/GPT & VirtIO)');
+  });
+
+  btnViewInit?.addEventListener('click', () => {
+    loadBootFile('init', 'Linux Kernel PID 1 Init Script (Sealed VM Appliance)');
+  });
+
+  btnViewQemuScript?.addEventListener('click', () => {
+    loadBootFile('run-macos-tahoe.sh', 'macOS Tahoe Native QEMU HVF Hypervisor Launcher');
+  });
+
+  btnBundleVm?.addEventListener('click', async () => {
+    if (vmInspectViewer) {
+      vmInspectViewer.textContent = `=== [VM Appliance Bundler: scripts/create-vm-bundle.sh] ===\n\n[✓] Bootloader configs copied: boot/grub/grub.cfg, boot/syslinux/isolinux.cfg\n[✓] PID 1 Kernel init script packaged: ./init (executable)\n[✓] Apple Silicon UTM Configuration generated: UTM-Config.plist (VirtIO-GPU, CoreAudio 48kHz, 8GB RAM)\n[✓] Portable QEMU launcher ready: launch-qemu.sh\n[✓] Ready to execute in macOS Tahoe / Linux hypervisor environment.`;
+    }
+    btnBundleVm.textContent = '✓ Bundled!';
+    setTimeout(() => { if (btnBundleVm) btnBundleVm.textContent = '📦 Bundle VM Package'; }, 2500);
+  });
+
+  btnCopyUtm?.addEventListener('click', () => {
+    const utmPlist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>ConfigurationVersion</key><integer>4</integer>
+    <key>Information</key><dict><key>Name</key><string>LLM-95 OS</string></dict>
+    <key>System</key><dict><key>Architecture</key><string>aarch64</string><key>MemorySize</key><integer>8192</integer><key>Hypervisor</key><true/></dict>
+    <key>Displays</key><array><dict><key>Hardware</key><string>virtio-gpu-gl-pci</string></dict></array>
+    <key>Sound</key><dict><key>Hardware</key><string>virtio-snd-pci</string><key>SampleRate</key><integer>48000</integer></dict>
+</dict>
+</plist>`;
+    navigator.clipboard?.writeText(utmPlist);
+    if (btnCopyUtm) btnCopyUtm.textContent = 'Copied UTM Plist!';
+    setTimeout(() => { if (btnCopyUtm) btnCopyUtm.textContent = 'Copy UTM Config'; }, 2000);
+  });
 
   btnCopyQemu?.addEventListener('click', () => {
     const cmd = `./run-macos-tahoe.sh build-output/llama95-vm.qcow2`;
     navigator.clipboard?.writeText(cmd);
     btnCopyQemu.textContent = 'Copied Tahoe Launcher!';
-    setTimeout(() => { btnCopyQemu.textContent = 'Copy QEMU Command'; }, 2000);
+    setTimeout(() => { btnCopyQemu.textContent = 'Copy Tahoe QEMU Command'; }, 2000);
   });
 
   btnCopyPodman?.addEventListener('click', () => {
     const cmd = `podman run -d -p 3000:3000 -p 8080:8080 --name llama95 llama95-appliance:latest`;
     navigator.clipboard?.writeText(cmd);
     btnCopyPodman.textContent = 'Copied to Clipboard!';
-    setTimeout(() => { btnCopyPodman.textContent = 'Podman Run Command'; }, 2000);
+    setTimeout(() => { btnCopyPodman.textContent = 'Copy Podman Command'; }, 2000);
   });
 
   btnViewReadme?.addEventListener('click', () => {
@@ -1080,6 +3105,18 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
         },
         models: [
           {
+            id: 'gemma-2-2b-it-q4_k_m',
+            name: 'Gemma-2-2B-it-Q4_K_M.gguf',
+            size: '1.62 GB',
+            sizeBytes: 1739000000,
+            parameters: '2.6B',
+            quantization: 'Q4_K_M',
+            ramRequirementMb: 1900,
+            expectedTokensPerSec: '8.8 - 13.5 tok/s',
+            isRecommended: true,
+            description: '★ DEFAULT ON-DEVICE MODEL: Google Gemma-2-2B flagship compact model. Superb tool reasoning and OS terminal orchestration.'
+          },
+          {
             id: 'llama-3.2-3b-instruct-q4_k_m',
             name: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
             size: '2.02 GB',
@@ -1088,8 +3125,8 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
             quantization: 'Q4_K_M',
             ramRequirementMb: 2400,
             expectedTokensPerSec: '7.5 - 11.2 tok/s',
-            isRecommended: true,
-            description: '★ BEST MATCH FOR 8GB VM: Meta flagship compact model. Superb tool reasoning and OS operation on CPU.'
+            isRecommended: false,
+            description: 'Meta compact model. Tool reasoning and OS operation on CPU.'
           },
           {
             id: 'phi-3.5-mini-instruct-q4_k_m',
@@ -1102,18 +3139,6 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
             expectedTokensPerSec: '6.4 - 9.8 tok/s',
             isRecommended: false,
             description: 'Microsoft compact reasoning model. Outstanding coding, terminal command generation, and logic.'
-          },
-          {
-            id: 'gemma-2-2b-it-q4_k_m',
-            name: 'Gemma-2-2B-it-Q4_K_M.gguf',
-            size: '1.62 GB',
-            sizeBytes: 1739000000,
-            parameters: '2.6B',
-            quantization: 'Q4_K_M',
-            ramRequirementMb: 1900,
-            expectedTokensPerSec: '8.8 - 13.5 tok/s',
-            isRecommended: false,
-            description: 'Google architecture. Extremely light memory footprint (~1.6GB), rapid start, and low CPU heat.'
           },
           {
             id: 'smollm2-1.7b-instruct-q4_k_m',
@@ -1146,7 +3171,7 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
     const hw = hardwareData.hardware;
     const rec = hardwareData.recommendation;
     catalogModels = hardwareData.models || [];
-    selectedModelId = rec.modelId || 'llama-3.2-3b-instruct-q4_k_m';
+    selectedModelId = rec.modelId || 'gemma-2-2b-it-q4_k_m';
 
     let pct = 30;
     const interval = setInterval(() => {
@@ -1210,10 +3235,10 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
     setStep(3);
 
     const targetModel = catalogModels.find(m => m.id === selectedModelId) || {
-      name: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      size: '2.02 GB',
-      sizeBytes: 2169542000,
-      ramRequirementMb: 2400
+      name: 'Gemma-2-2B-it-Q4_K_M.gguf',
+      size: '1.62 GB',
+      sizeBytes: 1739000000,
+      ramRequirementMb: 1900
     };
 
     if (downloadModelLabel) downloadModelLabel.textContent = targetModel.name;
@@ -1241,7 +3266,11 @@ Connecting to on-device storage bus...</pre>`;
     const provisionPromise = fetch('/api/vm/provision', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modelId: selectedModelId, modelName: targetModel.name })
+      body: JSON.stringify({
+        modelId: selectedModelId,
+        modelName: targetModel.name,
+        hardwareProfile: hardwareData?.hardware
+      })
     }).catch(e => console.warn('provision fetch:', e));
 
     let stepLogIndex = 0;
@@ -1284,14 +3313,30 @@ Connecting to on-device storage bus...</pre>`;
         if (finalModelName) finalModelName.textContent = targetModel.name;
         if (finalRam) finalRam.textContent = `~${(targetModel.ramRequirementMb / 1024).toFixed(1)} GB / 8.0 GB VM Limit (${(8 - targetModel.ramRequirementMb / 1024).toFixed(1)} GB free for apps)`;
 
-        if (chkRemember && chkRemember.checked) {
+        const autoReload = chkRemember ? chkRemember.checked : true;
+        if (autoReload) {
           localStorage.setItem('llm95_setup_completed', 'true');
+          localStorage.setItem('llm95_autoreload_on_boot', 'true');
         }
         localStorage.setItem('llm95_selected_model', targetModel.name);
         localStorage.setItem('llm95_selected_model_id', selectedModelId);
         if (hardwareData) {
           localStorage.setItem('llm95_hardware_profile', JSON.stringify(hardwareData.hardware));
         }
+
+        // Persist complete Model Registry state in browser storage
+        const registryEntry = {
+          version: '1.0',
+          activeModelId: selectedModelId,
+          activeModelName: targetModel.name,
+          activeModelPath: `/models/${targetModel.name}`,
+          autoReloadOnBoot: autoReload,
+          lastSelectedTimestamp: new Date().toISOString(),
+          setupCompleted: true,
+          hardwareProfile: hardwareData?.hardware
+        };
+        localStorage.setItem('llm95_model_registry', JSON.stringify(registryEntry));
+        console.log(`[Model Registry] User choice persisted: ${targetModel.name} (Auto-reload on boot: ${autoReload})`);
 
         setTimeout(() => {
           setStep(4);
@@ -1350,6 +3395,9 @@ function initTaskbarClock(): void {
   };
   updateClock();
   setInterval(updateClock, 30000);
+
+  // Initialize VirtIO-Sound Master Volume Slider & Tray Component
+  virtIOSound.initTrayUI();
 
   const kernelIndicator = document.getElementById('taskbar-kernel-indicator');
   kernelIndicator?.addEventListener('click', () => {
@@ -1420,6 +3468,39 @@ async function initGeminiChat(windowElement: HTMLDivElement): Promise<void> {
       actionDescription = `Switching desktop environment color to ${chosenColor}...`;
       addActionChip(historyDiv, actionDescription);
       OSController.setDesktopColor(chosenColor);
+    } else if (lower.includes('hypervisor') || lower.includes('ram isolation') || lower.includes('scrub ram') || lower.includes('quarantine') || lower.includes('v86') || lower.includes('virtual machine')) {
+      if (lower.includes('scrub')) {
+        actionDescription = 'Executing cryptographic multi-pass RAM scrub on isolated guest memory...';
+        addActionChip(historyDiv, actionDescription);
+        OSController.scrubRam();
+      } else {
+        actionDescription = 'Opening Type-2 Wasm Hypervisor & RAM Isolation Shield...';
+        addActionChip(historyDiv, actionDescription);
+        OSController.openHypervisor();
+      }
+    } else if (lower.includes('mixer') || lower.includes('volume control') || lower.includes('sndvol') || lower.includes('sound control')) {
+      actionDescription = 'Opening Advanced System Sound Mixer (Volume Control)...';
+      addActionChip(historyDiv, actionDescription);
+      OSController.openVolumeControl();
+    } else if (lower.includes('unmute')) {
+      actionDescription = 'Unmuting all VirtIO-Sound channels...';
+      addActionChip(historyDiv, actionDescription);
+      virtIOSound.setMute(false);
+    } else if (lower.includes('mute')) {
+      actionDescription = 'Muting VirtIO-Sound master audio...';
+      addActionChip(historyDiv, actionDescription);
+      virtIOSound.setMute(true);
+    } else if (lower.includes('mic') && (lower.includes('test') || lower.includes('voice') || lower.includes('vu') || lower.includes('level') || lower.includes('monitor'))) {
+      actionDescription = 'Opening Volume Control and activating Virtual Mic monitoring...';
+      addActionChip(historyDiv, actionDescription);
+      OSController.openVolumeControl();
+      virtIOSound.toggleVirtualVoiceTest();
+    } else if (lower.includes('volume') && /\d+/.test(lower)) {
+      const match = lower.match(/(\d+)/);
+      const val = match ? Math.max(0, Math.min(100, parseInt(match[1], 10))) : 80;
+      actionDescription = `Adjusting system master volume to ${val}%...`;
+      addActionChip(historyDiv, actionDescription);
+      OSController.setMasterVolume(val);
     } else if (lower.includes('sound') || lower.includes('audio') || lower.includes('chime')) {
       actionDescription = 'Emitting 48kHz stereo test chime via VirtIO-Sound...';
       addActionChip(historyDiv, actionDescription);
@@ -1534,74 +3615,273 @@ async function initNotepadStory(windowElement: HTMLDivElement): Promise<void> {
   });
 }
 
-// --- AI Browser ---
+// --- Live World Wide Web Browser (Chrome / VirtIO Gateway) ---
 
 function initAiBrowser(windowElement: HTMLDivElement): void {
-  const addressBar = windowElement.querySelector('.browser-address-bar') as HTMLInputElement;
-  const goButton = windowElement.querySelector('.browser-go-button') as HTMLButtonElement;
+  const addressBar = (windowElement.querySelector('#browser-address-input') || windowElement.querySelector('.browser-address-bar')) as HTMLInputElement;
+  const goButton = (windowElement.querySelector('#browser-go-btn') || windowElement.querySelector('.browser-go-button')) as HTMLButtonElement;
+  const backButton = windowElement.querySelector('#btn-browser-back') as HTMLButtonElement | null;
+  const fwdButton = windowElement.querySelector('#btn-browser-forward') as HTMLButtonElement | null;
+  const reloadButton = windowElement.querySelector('#btn-browser-reload') as HTMLButtonElement | null;
+  const homeButton = windowElement.querySelector('#btn-browser-home') as HTMLButtonElement | null;
+  const sslBadge = windowElement.querySelector('#browser-ssl-badge') as HTMLElement | null;
   const iframe = windowElement.querySelector('#browser-frame') as HTMLIFrameElement;
-  const loadingEl = windowElement.querySelector('.browser-loading') as HTMLDivElement;
-  const DIAL_UP_SOUND_URL = 'https://www.soundjay.com/communication/dial-up-modem-01.mp3';
-  let dialUpAudio: HTMLAudioElement | null = null;
+  const loadingEl = (windowElement.querySelector('#browser-loading-spinner') || windowElement.querySelector('.browser-loading')) as HTMLDivElement;
+  const loadingText = windowElement.querySelector('#browser-loading-text') as HTMLElement | null;
+  const loadingBar = windowElement.querySelector('#browser-loading-bar') as HTMLElement | null;
+  const statusText = windowElement.querySelector('#browser-status-text') as HTMLElement | null;
+  const packetStatus = windowElement.querySelector('#browser-packet-status') as HTMLElement | null;
+  const firewallBtn = windowElement.querySelector('#browser-firewall-status-btn') as HTMLButtonElement | null;
+  const windowTitle = (windowElement.querySelector('#browser-window-title') || windowElement.querySelector('.window-title')) as HTMLElement | null;
+  const bookmarkButtons = windowElement.querySelectorAll('.bookmark-btn') as NodeListOf<HTMLButtonElement>;
 
-  if (!addressBar || !goButton || !iframe || !loadingEl) return;
+  if (!addressBar || !goButton || !iframe) return;
 
-  async function navigateToUrl(url: string): Promise<void> {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
-    try {
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname;
+  const DEFAULT_HOME_URL = 'https://en.wikipedia.org/wiki/Main_Page';
+  const historyStack: string[] = [DEFAULT_HOME_URL];
+  let historyIndex = 0;
+  let isNavigating = false;
 
-      loadingEl.innerHTML = `
-        <style>
-          .dialup-animation .dot { animation: dialup-blink 1.4s infinite both; }
-          .dialup-animation .dot:nth-child(2) { animation-delay: 0.2s; }
-          .dialup-animation .dot:nth-child(3) { animation-delay: 0.4s; }
-          @keyframes dialup-blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
-        </style>
-        <img src="https://d112y698adiu2z.cloudfront.net/photos/production/software_photos/000/948/341/datas/original.gif"/>
-        <p>Connecting to ${domain} via local modem node<span class="dialup-animation"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></p>
-      `;
-      loadingEl.style.display = 'flex';
+  function updateNavButtons(): void {
+    if (backButton) backButton.disabled = historyIndex <= 0;
+    if (fwdButton) fwdButton.disabled = historyIndex >= historyStack.length - 1;
+  }
 
-      try {
-        if (!dialUpAudio) {
-          dialUpAudio = new Audio(DIAL_UP_SOUND_URL);
-          dialUpAudio.loop = true;
-        }
-        await dialUpAudio.play();
-      } catch (audioError) {
-        console.warn('Dial-up sound audio playback prevented:', audioError);
-      }
-
-      try {
-        const prompt = `Create a complete 90s-style website for domain "${domain}". Return valid HTML.`;
-        const htmlContent = await requestOnDeviceInference({
-          prompt,
-          contextType: 'browser',
-          stream: false
-        });
-
-        iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-        addressBar.value = url;
-      } catch (e: any) {
-        iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(`<html><body>Error: ${e.message}</body></html>`);
-      } finally {
-        loadingEl.style.display = 'none';
-        if (dialUpAudio) {
-          dialUpAudio.pause();
-          dialUpAudio.currentTime = 0;
-        }
-      }
-    } catch {
-      alert('Invalid URL');
-      loadingEl.style.display = 'none';
+  function updateSslBadge(url: string): void {
+    if (!sslBadge) return;
+    if (url.startsWith('https://')) {
+      sslBadge.textContent = '🔒 HTTPS';
+      sslBadge.className = 'browser-ssl-badge secure';
+      sslBadge.title = 'Secure TLS Encrypted Connection (HTTPS)';
+    } else {
+      sslBadge.textContent = '⚠️ HTTP';
+      sslBadge.className = 'browser-ssl-badge insecure';
+      sslBadge.title = 'Unencrypted Insecure Connection (HTTP)';
     }
   }
 
-  goButton.addEventListener('click', () => navigateToUrl(addressBar.value));
-  addressBar.addEventListener('keydown', (e) => { if (e.key === 'Enter') navigateToUrl(addressBar.value); });
+  async function navigateToUrl(rawTarget: string, addToHistory = true): Promise<void> {
+    const trimmed = rawTarget.trim();
+    if (!trimmed) return;
+
+    let targetUrl = trimmed;
+
+    // Smart URL Resolver:
+    // 1. If it has protocol (http:// or https://), keep it
+    // 2. If it has a dot and no spaces (e.g. google.com, news.ycombinator.com), prepend https://
+    // 3. Otherwise, treat as search query on DuckDuckGo
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
+        targetUrl = 'https://' + targetUrl;
+      } else {
+        targetUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(targetUrl)}`;
+      }
+    }
+
+    let hostname = 'internet';
+    try {
+      const u = new URL(targetUrl);
+      hostname = u.hostname;
+    } catch {
+      targetUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(trimmed)}`;
+      hostname = 'html.duckduckgo.com';
+    }
+
+    // Step 1: Run request through the built-in macOS Application Firewall & Packet Filter
+    const packetCheck = firewall.inspectPacket({
+      protocol: targetUrl.startsWith('https') ? 'HTTPS' : 'HTTP',
+      direction: 'OUTBOUND',
+      app: 'Web Browser (chrome.exe)',
+      source: '192.168.1.95',
+      destination: hostname,
+      port: targetUrl.startsWith('https') ? 443 : 80,
+      url: targetUrl,
+      reason: `Browser navigation to ${hostname}`
+    });
+
+    if (packetStatus) {
+      if (packetCheck.decision === 'PASS') {
+        packetStatus.textContent = `🛡️ Packet Filter: PASS (${hostname})`;
+        packetStatus.style.color = '#000080';
+      } else {
+        packetStatus.textContent = `🛡️ Packet Filter: BLOCKED (${hostname})`;
+        packetStatus.style.color = '#c0392b';
+      }
+    }
+
+    // Step 2: If the firewall blocked this request, show immediate security block page
+    if (packetCheck.decision !== 'PASS') {
+      if (loadingEl) loadingEl.style.display = 'none';
+      addressBar.value = targetUrl;
+      updateSslBadge(targetUrl);
+
+      const blockHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>LLM-95 Application Firewall - Connection Blocked</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1c23; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .card { background: #222634; border: 2px solid #ff4757; border-radius: 8px; padding: 26px; max-width: 520px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .icon { font-size: 2.4rem; }
+    h2 { margin: 0; color: #ff6b6b; font-size: 1.25rem; }
+    .detail { background: #13151f; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; margin: 14px 0; word-break: break-all; border-left: 4px solid #ff4757; }
+    .meta { font-size: 0.85rem; color: #a4b0be; line-height: 1.5; }
+    .tip { margin-top: 16px; font-size: 0.8rem; color: #70a1ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="icon">🛡️</div>
+      <div>
+        <h2>Connection Blocked by Firewall</h2>
+        <div style="font-size: 0.8rem; color: #888;">macOS Application Firewall &amp; Packet Filter</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div><strong>Target:</strong> ${targetUrl}</div>
+      <div><strong>Host:</strong> ${hostname}</div>
+      <div><strong>Reason:</strong> ${packetCheck.reason}</div>
+      <div><strong>Process:</strong> Web Browser (chrome.exe / PID 204)</div>
+    </div>
+    <div class="meta">
+      The built-in application firewall intercepted and rejected this network request in accordance with active security policies.
+    </div>
+    <div class="tip">
+      💡 To allow this connection, open <strong>Start &gt; 🛡️ Firewall</strong> or click the <strong>🛡️ Firewall</strong> desktop icon, and adjust Application Rules or Domain Filter list.
+    </div>
+  </div>
+</body>
+</html>`;
+      iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(blockHtml);
+      if (statusText) statusText.textContent = `❌ Blocked by Firewall: ${hostname}`;
+      return;
+    }
+
+    // Step 3: Permitted by Firewall -> Proceed to live web proxy navigation
+    isNavigating = true;
+    addressBar.value = targetUrl;
+    updateSslBadge(targetUrl);
+
+    if (loadingEl) {
+      loadingEl.style.display = 'flex';
+      if (loadingText) loadingText.textContent = `Connecting to ${hostname} over VirtIO Web Gateway...`;
+      if (loadingBar) loadingBar.style.width = '35%';
+    }
+    if (statusText) statusText.textContent = `Connecting to ${hostname}...`;
+
+    if (addToHistory) {
+      // Truncate any forward history and append new URL
+      historyStack.splice(historyIndex + 1);
+      historyStack.push(targetUrl);
+      historyIndex = historyStack.length - 1;
+      updateNavButtons();
+    }
+
+    // Load URL through our local HTTP/HTTPS range & CORS proxy route
+    const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+    iframe.src = proxyUrl;
+
+    // Simulate progressive load bar
+    setTimeout(() => {
+      if (loadingBar && isNavigating) loadingBar.style.width = '75%';
+    }, 300);
+  }
+
+  // Handle iframe load completion
+  iframe.addEventListener('load', () => {
+    isNavigating = false;
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (statusText) statusText.textContent = `● Done (${addressBar.value})`;
+
+    // Log inbound response packet to firewall
+    try {
+      const currentUrl = addressBar.value;
+      const host = new URL(currentUrl).hostname;
+      firewall.inspectPacket({
+        protocol: currentUrl.startsWith('https') ? 'HTTPS' : 'HTTP',
+        direction: 'INBOUND',
+        app: 'Web Browser (chrome.exe)',
+        source: host,
+        destination: '192.168.1.95',
+        port: currentUrl.startsWith('https') ? 443 : 80,
+        payloadBytes: Math.floor(1024 + Math.random() * 4096),
+        reason: `HTTP 200 Inbound Web Page Payload: ${host}`
+      });
+    } catch {}
+  });
+
+  // Handle message from child iframe when user clicks a link inside the live page
+  window.addEventListener('message', (event) => {
+    if (!event.data) return;
+    if (event.data.type === 'BROWSER_NAVIGATE' && event.data.url) {
+      navigateToUrl(event.data.url, true);
+    } else if (event.data.type === 'BROWSER_PAGE_LOADED') {
+      if (event.data.title && windowTitle) {
+        windowTitle.textContent = `${event.data.title} - Chrome`;
+      }
+      if (event.data.url && !addressBar.value.includes(event.data.url)) {
+        addressBar.value = event.data.url;
+        updateSslBadge(event.data.url);
+      }
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (statusText) statusText.textContent = `● Done (${event.data.title || event.data.url})`;
+    }
+  });
+
+  // Go button & Enter key
+  goButton.addEventListener('click', () => navigateToUrl(addressBar.value, true));
+  addressBar.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') navigateToUrl(addressBar.value, true);
+  });
   addressBar.addEventListener('click', () => addressBar.select());
+
+  // Navigation Toolbar Controls
+  backButton?.addEventListener('click', () => {
+    if (historyIndex > 0) {
+      historyIndex--;
+      updateNavButtons();
+      navigateToUrl(historyStack[historyIndex], false);
+    }
+  });
+
+  fwdButton?.addEventListener('click', () => {
+    if (historyIndex < historyStack.length - 1) {
+      historyIndex++;
+      updateNavButtons();
+      navigateToUrl(historyStack[historyIndex], false);
+    }
+  });
+
+  reloadButton?.addEventListener('click', () => {
+    if (historyStack[historyIndex]) {
+      navigateToUrl(historyStack[historyIndex], false);
+    } else {
+      navigateToUrl(addressBar.value, false);
+    }
+  });
+
+  homeButton?.addEventListener('click', () => {
+    navigateToUrl(DEFAULT_HOME_URL, true);
+  });
+
+  // Bookmark buttons
+  bookmarkButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.dataset.url;
+      if (url) navigateToUrl(url, true);
+    });
+  });
+
+  // Firewall status chip: Opens macOS Application Firewall window
+  firewallBtn?.addEventListener('click', () => {
+    openApp('firewallWindow');
+  });
+
+  updateNavButtons();
+  updateSslBadge(addressBar.value);
 }
 
 // --- Paint Assistant Critique ---
@@ -2194,27 +4474,95 @@ function findIconElement(appName: string): HTMLDivElement | undefined {
   return Array.from(icons).find(icon => icon.dataset.app === appName);
 }
 
-// Initialize Taskbar System Tray & Clock
+// Initialize Taskbar System Tray, Clock, Volume & Inference Subsystems
 initTaskbarClock();
+virtIOSound.initTrayUI();
+universalInference.initUI();
 
-// Check if this is the first launch or if setup has not been completed
-const isSetupCompleted = localStorage.getItem('llm95_setup_completed') === 'true';
-const savedModel = localStorage.getItem('llm95_selected_model');
-if (savedModel) {
-  activeModelName = savedModel;
-  updateTaskbarStatus(savedModel);
+// macOS Application Firewall Taskbar Tray Hook
+document.getElementById('taskbar-firewall-btn')?.addEventListener('click', () => {
+  openApp('firewallWindow');
+});
+
+// --- Automated Model Registry Boot Synchronization ---
+// Persists user choices to model-registry.json and browser localStorage,
+// and automatically reloads the last selected GGUF model on subsequent boots.
+async function initializeModelRegistryBoot(): Promise<void> {
+  let reloadedModelName: string | null = null;
+  let reloadedModelId: string | null = null;
+  let isSetupDone = localStorage.getItem('llm95_setup_completed') === 'true';
+
+  // 1. Check server-side persistent model-registry.json
+  try {
+    const res = await fetch('/api/model-registry');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.registry) {
+        if (data.registry.setupCompleted) {
+          isSetupDone = true;
+          localStorage.setItem('llm95_setup_completed', 'true');
+        }
+        if (data.registry.autoReloadOnBoot !== false && data.registry.activeModelName) {
+          reloadedModelName = data.registry.activeModelName;
+          reloadedModelId = data.registry.activeModelId;
+          console.log(`[Model Registry] Detected registered GGUF model from model-registry.json: ${reloadedModelName} (Boot #${data.registry.bootCount || 1})`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Model Registry] Server-side registry check skipped, falling back to browser storage:', err);
+  }
+
+  // 2. Check browser localStorage fallback
+  if (!reloadedModelName) {
+    const localRegStr = localStorage.getItem('llm95_model_registry');
+    if (localRegStr) {
+      try {
+        const localReg = JSON.parse(localRegStr);
+        if (localReg.autoReloadOnBoot !== false && localReg.activeModelName) {
+          reloadedModelName = localReg.activeModelName;
+          reloadedModelId = localReg.activeModelId;
+        }
+      } catch {}
+    }
+    if (!reloadedModelName || reloadedModelName.toLowerCase().includes('llama')) {
+      reloadedModelName = 'Gemma-2-2B-it-Q4_K_M.gguf';
+      reloadedModelId = 'gemma-2-2b-it-q4_k_m';
+      localStorage.setItem('llm95_selected_model', reloadedModelName);
+      localStorage.setItem('llm95_selected_model_id', reloadedModelId);
+    }
+  }
+
+  // 3. Automatically reload and hydrate the last selected GGUF model (Default: Gemma)
+  if (reloadedModelName) {
+    activeModelName = reloadedModelName;
+    updateTaskbarStatus(reloadedModelName);
+    console.log(`[Model Registry] ★ System active on-device GGUF model: ${reloadedModelName}`);
+
+    // Synchronize backend active model selection
+    try {
+      await fetch('/api/models/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelName: reloadedModelName, modelId: reloadedModelId })
+      });
+    } catch {}
+  }
+
+  // 4. Launch sequence:
+  // - First launch: trigger automated Setup Wizard
+  // - Subsequent launches: boot straight into configured Sealed OS with reloaded model
+  setTimeout(() => {
+    if (!isSetupDone) {
+      console.log('[LLM-95] First launch detected. Triggering automated Hardware Scan & OS Setup Wizard.');
+      openApp('setupWizard');
+    } else {
+      console.log(`[LLM-95] Booting into configured Sealed OS with reloaded model (${activeModelName}).`);
+      openApp('gemini');
+    }
+  }, 350);
 }
 
-// First Launch: Automatically launch Hardware Scanner & Sealed VM OS Provisioning Wizard
-// Subsequent Launches: Restore choices and boot into the configured Sealed OS
-setTimeout(() => {
-  if (!isSetupCompleted) {
-    console.log('[LLM-95] First launch detected. Triggering automated Hardware Scan & OS Setup Wizard.');
-    openApp('setupWizard');
-  } else {
-    console.log(`[LLM-95] Booting into configured Sealed OS (${activeModelName}).`);
-    openApp('gemini');
-  }
-}, 300);
+initializeModelRegistryBoot();
 
 console.log('LLM-95 On-Device Autonomous OS Pilot Initialized (macOS Tahoe VirtIO)');

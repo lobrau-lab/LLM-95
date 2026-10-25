@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>ConfigurationVersion</key>
+    <integer>4</integer>
+    <key>Information</key>
+    <dict>
+        <key>Name</key>
+        <string>LLM-95 OS (On-Device Neural VM)</string>
+        <key>Icon</key>
+        <string>retro-computer</string>
+        <key>Notes</key>
+        <string>Sealed macOS Tahoe VirtIO Virtual Machine with on-device GGUF neural operator.</string>
+    </dict>
+    <key>System</key>
+    <dict>
+        <key>Architecture</key>
+        <string>aarch64</string>
+        <key>CPUCount</key>
+        <integer>4</integer>
+        <key>MemorySize</key>
+        <integer>8192</integer>
+        <key>Hypervisor</key>
+        <true/>
+    </dict>
+    <key>Displays</key>
+    <array>
+        <dict>
+            <key>Hardware</key>
+            <string>virtio-gpu-gl-pci</string>
+            <key>Width</key>
+            <integer>1920</integer>
+            <key>Height</key>
+            <integer>1080</integer>
+        </dict>
+    </array>
+    <key>Sound</key>
+    <dict>
+        <key>Hardware</key>
+        <string>virtio-snd-pci</string>
+        <key>SampleRate</key>
+        <integer>48000</integer>
+    </dict>
+</dict>
+</plist>

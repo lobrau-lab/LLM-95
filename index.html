@@ -107,9 +107,457 @@
         />
         <span>GemPlayer</span>
       </div>
-
+      <div class="icon" data-app="volumeControl">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png"
+          alt="Volume Control"
+          style="width: 48px; height: 48px"
+        />
+        <span>Volume Control</span>
+      </div>
+      <div class="icon" data-app="v86Window">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/computer_explorer_cool-0.png"
+          alt="x86 Virtual Machine"
+          style="width: 48px; height: 48px"
+        />
+        <span>x86 Virtual Machine</span>
+      </div>
+      <div class="icon" data-app="hypervisorWindow">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/key_win-0.png"
+          alt="Hypervisor & RAM Isolation Shield"
+          style="width: 48px; height: 48px"
+        />
+        <span>RAM Hypervisor</span>
+      </div>
+      <div class="icon" data-app="firewallWindow">
+        <img
+          src="https://win98icons.alexmeub.com/icons/png/trust0-0.png"
+          alt="macOS Application Firewall"
+          style="width: 48px; height: 48px"
+        />
+        <span>Firewall</span>
+      </div>
 
       <!-- Windows -->
+      <!-- Real x86 Virtual Machine (Wasm Hardware Core & VGA Framebuffer) -->
+      <div class="window resizable" id="v86Window" style="width: 860px; height: 640px; min-width: 640px; min-height: 480px; display: none;">
+        <div class="window-titlebar">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <img src="https://win98icons.alexmeub.com/icons/png/computer_explorer_cool-0.png" alt="" style="width: 14px; height: 14px;" />
+            <span class="window-title">Gemma 95 x86 Hardware Virtual Machine (v86 Wasm Core)</span>
+          </div>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+
+        <!-- Menu Bar -->
+        <div class="win95-menu-bar">
+          <div class="win95-menu-item" id="v86-menu-machine-toggle" tabindex="0">
+            Machine
+            <div class="win95-dropdown-menu" id="v86-dropdown-machine" style="display: none;">
+              <div class="dropdown-item" id="v86-menu-boot">▶ Boot / Run</div>
+              <div class="dropdown-item" id="v86-menu-pause">⏸ Pause VM</div>
+              <div class="dropdown-item" id="v86-menu-reset">🔄 Reset (Ctrl+Alt+Del)</div>
+              <div class="dropdown-item" id="v86-menu-poweroff">🛑 ACPI Power Off</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="v86-menu-save-state">💾 Save Snapshot...</div>
+              <div class="dropdown-item" id="v86-menu-restore-state">📂 Restore Snapshot...</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="v86-menu-exit">Exit</div>
+            </div>
+          </div>
+
+          <div class="win95-menu-item" id="v86-menu-disks-toggle" tabindex="0">
+            Disks &amp; Media
+            <div class="win95-dropdown-menu" id="v86-dropdown-disks" style="display: none;">
+              <div class="dropdown-item active-check" id="v86-disk-freedos">✓ Boot FreeDOS 7.22 (Floppy)</div>
+              <div class="dropdown-item" id="v86-disk-kolibri">Boot KolibriOS (32-bit GUI)</div>
+              <div class="dropdown-item" id="v86-disk-linux">Boot Minimal Linux 4.x ISO</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="v86-disk-mount-file">📥 Mount Local Disk Image (.img/.iso)...</div>
+              <div class="dropdown-item" id="v86-disk-eject">⏏ Eject All Disks</div>
+            </div>
+          </div>
+
+          <div class="win95-menu-item" id="v86-menu-ram-toggle" tabindex="0">
+            Memory RAM
+            <div class="win95-dropdown-menu" id="v86-dropdown-ram" style="display: none;">
+              <div class="dropdown-item" id="v86-ram-32">32 MB Isolated Wasm RAM</div>
+              <div class="dropdown-item active-check" id="v86-ram-64">✓ 64 MB Isolated Wasm RAM</div>
+              <div class="dropdown-item" id="v86-ram-128">128 MB Isolated Wasm RAM</div>
+            </div>
+          </div>
+
+          <div class="win95-menu-item" id="v86-menu-view-toggle" tabindex="0">
+            View
+            <div class="win95-dropdown-menu" id="v86-dropdown-view" style="display: none;">
+              <div class="dropdown-item active-check" id="v86-scale-100">✓ 100% Native 640x400</div>
+              <div class="dropdown-item" id="v86-scale-125">125% Scaled</div>
+              <div class="dropdown-item" id="v86-scale-150">150% Scaled</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="v86-view-crt">Toggle CRT Scanlines</div>
+              <div class="dropdown-item" id="v86-view-fullscreen">Fullscreen (F11)</div>
+            </div>
+          </div>
+
+          <div class="win95-menu-item" id="v86-menu-peripherals-toggle" tabindex="0">
+            Peripherals
+            <div class="win95-dropdown-menu" id="v86-dropdown-peripherals" style="display: none;">
+              <div class="dropdown-item" id="v86-periph-lock">🔒 Capture Pointer Lock (PS/2)</div>
+              <div class="dropdown-item" id="v86-periph-sound">🎛️ Sound Blaster 16 Controls...</div>
+            </div>
+          </div>
+
+          <div class="win95-menu-item" id="v86-menu-help-toggle" tabindex="0">
+            Help
+            <div class="win95-dropdown-menu" id="v86-dropdown-help" style="display: none;">
+              <div class="dropdown-item" id="v86-help-about">About x86 Virtual Machine...</div>
+            </div>
+          </div>
+
+          <div style="margin-left: auto; font-size: 0.68rem; color: #333; display: flex; align-items: center; gap: 8px;">
+            <span>Core: <strong>v86 x86-32 Wasm</strong></span>
+            <span>Audio: <strong>SB16 (44.1kHz)</strong></span>
+          </div>
+        </div>
+
+        <div class="window-content v86-window-content">
+          <!-- Hardware Bezel / Front Panel with LEDs -->
+          <div class="v86-front-panel">
+            <div class="v86-led-group">
+              <div class="v86-led-item" title="Main CPU Power">
+                <div class="v86-led-bulb green active" id="led-vm-power"></div>
+                <span>PWR</span>
+              </div>
+              <div class="v86-led-item" title="CPU Instruction Execution Activity">
+                <div class="v86-led-bulb green active" id="led-cpu-activity"></div>
+                <span>CPU</span>
+              </div>
+              <div class="v86-led-item" title="Floppy Diskette Activity">
+                <div class="v86-led-bulb amber" id="led-fdd-activity"></div>
+                <span>FDD</span>
+              </div>
+              <div class="v86-led-item" title="Hard Disk Sector Read/Write Activity">
+                <div class="v86-led-bulb red" id="led-hdd-activity"></div>
+                <span>HDD</span>
+              </div>
+              <div class="v86-led-item" title="UART COM1 Serial I/O Activity">
+                <div class="v86-led-bulb blue" id="led-serial-io"></div>
+                <span>SER</span>
+              </div>
+              <div class="v86-led-item" title="PS/2 Mouse Pointer Lock Captured">
+                <div class="v86-led-bulb yellow" id="led-pointer-lock"></div>
+                <span>LOCK</span>
+              </div>
+            </div>
+
+            <!-- Digital LCD Status Readouts -->
+            <div class="v86-lcd-display">
+              <span class="v86-lcd-metric" id="v86-metric-ips">~4.8 MIPS</span>
+              <span class="v86-lcd-metric" id="v86-metric-instructions">0 ops</span>
+              <span class="v86-lcd-metric" id="v86-metric-mode">VGA 640x400</span>
+              <span class="v86-lcd-metric" id="v86-metric-os">FreeDOS 7.22</span>
+            </div>
+          </div>
+
+          <!-- Quick Hardware Action Toolbar -->
+          <div class="v86-hardware-toolbar">
+            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+              <button class="win95-btn" id="btn-v86-boot" title="Boot / Resume Virtual Machine">▶ Boot</button>
+              <button class="win95-btn" id="btn-v86-pause" title="Pause CPU Execution">⏸ Pause</button>
+              <button class="win95-btn" id="btn-v86-reset" title="Hardware Reset (Ctrl+Alt+Del)">🔄 Reset</button>
+              <button class="win95-btn" id="btn-v86-poweroff" title="ACPI Stop / Power Off">🛑 Power Off</button>
+              <span class="v86-toolbar-separator"></span>
+              <button class="win95-btn" id="btn-v86-save-snap" title="Save memory & CPU state snapshot">💾 Save State</button>
+              <button class="win95-btn" id="btn-v86-load-snap" title="Restore snapshot from memory">📂 Load State</button>
+              <span class="v86-toolbar-separator"></span>
+              <button class="win95-btn" id="btn-v86-pointer-lock" title="Click to capture PS/2 mouse cursor (ESC to release)">🔒 Lock Mouse</button>
+              <button class="win95-btn" id="btn-v86-fullscreen" title="Full screen hardware view">⛶ Fullscreen</button>
+            </div>
+
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <select class="win95-select" id="v86-preset-select" style="font-size: 0.72rem; padding: 1px 3px;">
+                <option value="freedos">FreeDOS 7.22 (Preloaded Floppy)</option>
+                <option value="kolibri">KolibriOS (32-bit GUI Desktop)</option>
+                <option value="linux">Minimal Linux 4.x (Live ISO)</option>
+                <option value="custom">Custom Image / Local File...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tabbed Inspector & Console Deck -->
+          <div class="v86-tabs-header">
+            <button class="v86-tab-btn active" data-v86-tab="tab-v86-display">🖥️ VGA Hardware Display</button>
+            <button class="v86-tab-btn" data-v86-tab="tab-v86-serial">📟 UART COM1 Serial</button>
+            <button class="v86-tab-btn" data-v86-tab="tab-v86-gemma">🤖 Gemma Visual Supervisor</button>
+            <button class="v86-tab-btn" data-v86-tab="tab-v86-storage">💾 Storage &amp; OPFS Subsystem</button>
+            <button class="v86-tab-btn" data-v86-tab="tab-v86-hypervisor">🛡️ Hypervisor &amp; RAM Shield</button>
+          </div>
+
+          <!-- TAB 1: Real Hardware VGA Display & Screen Container -->
+          <div class="v86-tab-content active" id="tab-v86-display">
+            <div class="v86-crt-housing" id="v86-crt-housing">
+              <!-- Pointer Lock HUD (Auto-fades after 3 seconds) -->
+              <div class="pointer-lock-hud" id="pointer-lock-hud" style="display: none;">
+                🕹️ Cursor Captured — Press <kbd>[ESC]</kbd> to Release Cursor
+              </div>
+
+              <!-- v86 screen container (hardware canvas created by Wasm core) -->
+              <div id="screen_container" class="v86-screen-container"></div>
+            </div>
+          </div>
+
+          <!-- TAB 2: UART COM1 Serial Terminal Console -->
+          <div class="v86-tab-content" id="tab-v86-serial" style="display: none;">
+            <div class="v86-serial-container">
+              <div class="v86-serial-header">
+                <span>UART 16550A Standard Serial Bus (/dev/ttyS0 - COM1: 9600 8N1)</span>
+                <div style="display: flex; gap: 4px;">
+                  <button class="win95-btn" id="btn-serial-clear" style="font-size: 0.65rem;">Clear</button>
+                  <button class="win95-btn" id="btn-serial-copy" style="font-size: 0.65rem;">Copy Output</button>
+                </div>
+              </div>
+              <div class="v86-serial-terminal" id="v86-serial-terminal"></div>
+              <div class="v86-serial-input-row">
+                <span style="font-family: monospace; font-size: 0.76rem; font-weight: bold; color: #00FF00;">COM1&gt;</span>
+                <input type="text" id="v86-serial-input" class="v86-serial-input-field" placeholder="Type text or command to send directly to COM1 serial pipe..." />
+                <button class="win95-btn" id="btn-serial-send" style="min-width: 65px; font-weight: bold;">Send</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: Gemma Copilot & Visual Supervisor -->
+          <div class="v86-tab-content" id="tab-v86-gemma" style="display: none;">
+            <div class="v86-gemma-supervisor-deck">
+              <div class="v86-gemma-left">
+                <div style="font-size: 0.74rem; font-weight: bold; color: #000080; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                  <span>Framebuffer Perception Snapshot</span>
+                  <button class="win95-btn" id="btn-gemma-snap-now" style="font-size: 0.65rem; padding: 1px 4px;">📸 Snap Now</button>
+                </div>
+                <div class="v86-gemma-preview-frame">
+                  <img id="gemma-snapshot-thumb" src="" alt="VGA Framebuffer snapshot" style="display: none; max-width: 100%; max-height: 180px; object-fit: contain; background: #000;" />
+                  <div id="gemma-snapshot-placeholder" style="color: #666; font-size: 0.72rem; text-align: center; padding: 20px;">
+                    No snapshot taken yet.<br />Click "Inspect &amp; Supervise" to capture live VGA framebuffer.
+                  </div>
+                </div>
+
+                <div class="win95-fieldset" style="margin-top: 8px; padding: 6px;">
+                  <legend class="win95-legend">Autonomous Execution</legend>
+                  <label class="win95-checkbox-container" style="font-size: 0.72rem;">
+                    <input type="checkbox" id="gemma-auto-execute" />
+                    <span>Auto-Pilot: Execute suggested commands directly into x86 keyboard</span>
+                  </label>
+                  <div style="font-size: 0.65rem; color: #555; margin-top: 4px;">
+                    Gemma will type keystrokes and scan-codes directly into the guest OS shell.
+                  </div>
+                </div>
+              </div>
+
+              <div class="v86-gemma-right">
+                <div style="font-size: 0.74rem; font-weight: bold; color: #000080; margin-bottom: 4px;">
+                  Visual Supervisor &amp; Shell Orchestrator
+                </div>
+                <!-- Chat / Diagnosis Feed -->
+                <div class="v86-gemma-feed" id="gemma-log-feed">
+                  <div class="gemma-feed-entry system">
+                    🤖 Gemma Supervisor Initialized. Monitoring x86 Wasm execution core, VGA framebuffer, and UART COM1 serial pipe.
+                  </div>
+                </div>
+
+                <!-- Quick Prompt Pills -->
+                <div class="v86-gemma-pills">
+                  <span class="gemma-pill" data-prompt="List files in C:\ and search for config">📁 List C:\</span>
+                  <span class="gemma-pill" data-prompt="Query conventional, XMS, and EMS memory in DOS">🧠 Check Memory</span>
+                  <span class="gemma-pill" data-prompt="Create and compile a C hello-world app">⚙️ Compile C Code</span>
+                  <span class="gemma-pill" data-prompt="Inspect autoexec.bat configuration">📜 View AUTOEXEC.BAT</span>
+                  <span class="gemma-pill" data-prompt="Diagnose current screen for errors or BSOD">🔍 Diagnose Screen</span>
+                  <span class="gemma-pill" data-prompt="Hardware Reset the VM">🔄 Reset VM</span>
+                </div>
+
+                <!-- Prompt Input Row -->
+                <div class="v86-gemma-input-row">
+                  <input type="text" id="gemma-prompt-input" class="win95-input" placeholder="Instruct Gemma to inspect screen, fix error, or run commands..." style="flex-grow: 1;" />
+                  <button class="win95-btn" id="btn-gemma-submit" style="font-weight: bold; min-width: 80px;">Supervise</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: Storage Subsystem & OPFS Manager -->
+          <div class="v86-tab-content" id="tab-v86-storage" style="display: none;">
+            <div class="v86-storage-deck">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <!-- Left: Capabilities & Quota -->
+                <div class="win95-fieldset" style="padding: 8px;">
+                  <legend class="win95-legend">HTTP 206 Byte-Range &amp; Quota Sniffing</legend>
+                  <div style="font-size: 0.72rem; line-height: 1.5;">
+                    <div>• <strong>HTTP 206 Partial Content:</strong> <span id="v86-range-status" style="color: #006600; font-weight: bold;">Verified (Accept-Ranges: bytes)</span></div>
+                    <div>• <strong>Sparse Range Streaming:</strong> Enabled for large multi-MB disk images</div>
+                    <div>• <strong>Browser Storage Quota:</strong> <span id="v86-quota-info">Calculating...</span></div>
+                    <div>• <strong>Persistence Engine:</strong> IndexedDB Sector Sync + Origin Private File System (OPFS)</div>
+                  </div>
+                </div>
+
+                <!-- Right: Drag & Drop Mounting -->
+                <div class="win95-fieldset" style="padding: 8px;">
+                  <legend class="win95-legend">Mount Local Disk Image</legend>
+                  <div class="v86-drop-zone" id="v86-drop-zone">
+                    <img src="https://win98icons.alexmeub.com/icons/png/hard_disk_drive-0.png" style="width: 32px; height: 32px; margin-bottom: 4px;" alt="" />
+                    <div style="font-weight: bold; font-size: 0.74rem;">Drag &amp; Drop .img / .iso here</div>
+                    <div style="font-size: 0.65rem; color: #555;">Zero-network allocation via File API sector slicing</div>
+                    <input type="file" id="v86-file-picker" style="display: none;" accept=".img,.iso,.bin,.ima,.vfd" />
+                    <button class="win95-btn" id="btn-v86-browse-file" style="margin-top: 6px; font-size: 0.7rem;">Browse File...</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- OPFS / Cached Disks Browser -->
+              <div class="win95-fieldset" style="margin-top: 10px; padding: 8px;">
+                <legend class="win95-legend">Available Disk Images &amp; OPFS Cache</legend>
+                <div class="v86-disk-table-container">
+                  <table class="v86-disk-table">
+                    <thead>
+                      <tr>
+                        <th>Image Name</th>
+                        <th>Type / Media</th>
+                        <th>Size</th>
+                        <th>Source</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="v86-disk-table-body">
+                      <tr>
+                        <td><strong>freedos722.img</strong></td>
+                        <td>Floppy (FDA)</td>
+                        <td>720 KB / 1.44 MB</td>
+                        <td>Bundled Local Asset</td>
+                        <td><button class="win95-btn mount-fda-btn" data-preset="freedos">Boot FDA</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>kolibri.img</strong></td>
+                        <td>Floppy (FDA - 32b GUI)</td>
+                        <td>1.44 MB</td>
+                        <td>Bundled Local Asset</td>
+                        <td><button class="win95-btn mount-fda-btn" data-preset="kolibri">Boot FDA</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>linux4.iso</strong></td>
+                        <td>CD-ROM (ISO 9660)</td>
+                        <td>7.71 MB</td>
+                        <td>HTTP 206 Partial Content</td>
+                        <td><button class="win95-btn mount-cd-btn" data-preset="linux">Boot CD</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 5: Hypervisor Governance & Isolated RAM Shield -->
+          <div class="v86-tab-content" id="tab-v86-hypervisor" style="display: none;">
+            <div class="v86-hypervisor-deck">
+              <!-- Top Header & Policy Badge -->
+              <div class="hypervisor-header-bar">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-weight: bold; color: #000080;">🛡️ Type-2 Wasm Hypervisor Core:</span>
+                  <span class="hypervisor-state-badge enforced" id="hyp-badge-state">ENFORCED (RING 0/3)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label class="win95-checkbox-container" style="font-size: 0.68rem; margin: 0;">
+                    <input type="checkbox" id="hyp-toggle-strict-isolation" checked />
+                    <span>Strict RAM Isolation (Auto-Quarantine)</span>
+                  </label>
+                  <label class="win95-checkbox-container" style="font-size: 0.68rem; margin: 0;">
+                    <input type="checkbox" id="hyp-toggle-auto-scrub" checked />
+                    <span>Auto-Scrub on Reset</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Quick Metrics Grid -->
+              <div class="hypervisor-quick-metrics">
+                <div class="hyp-metric-chip">
+                  <span class="title">Isolated RAM Size</span>
+                  <span class="value" id="hyp-val-ram-size">64.0 MB (16,384 pages)</span>
+                </div>
+                <div class="hyp-metric-chip">
+                  <span class="title">Redzone Canaries</span>
+                  <span class="value" id="hyp-val-canary" style="color: #008800;">ARMED (INTACT)</span>
+                </div>
+                <div class="hyp-metric-chip">
+                  <span class="title">Page Faults Trapped</span>
+                  <span class="value" id="hyp-val-faults">0 Overruns</span>
+                </div>
+                <div class="hyp-metric-chip">
+                  <span class="title">Cryptographic Scrubs</span>
+                  <span class="value" id="hyp-val-scrubs">0 Zero-Wipes</span>
+                </div>
+              </div>
+
+              <!-- Interactive RAM Allocation Matrix (64 physical blocks) -->
+              <div class="ram-matrix-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: bold; color: #000080;">Physical RAM Protection Domains (64 Segments Matrix):</span>
+                  <span style="font-size: 0.65rem; color: #555;">Hover block to inspect physical address &amp; permissions</span>
+                </div>
+                <div class="ram-matrix-grid" id="hyp-ram-matrix-grid">
+                  <!-- Generated dynamically by Hypervisor UI -->
+                </div>
+                <div class="ram-matrix-legend">
+                  <span class="legend-item"><span class="legend-dot" style="background: #222;"></span> Ring 0 Enclave</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #0044AA;"></span> Guest Kernel</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #DD0000;"></span> Canary Guard</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #00AAAA;"></span> VGA VRAM</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #8800AA;"></span> DMA Audio</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #008800;"></span> Clean User RAM</span>
+                  <span class="legend-item"><span class="legend-dot" style="background: #DDAA00;"></span> Active/Dirty RAM</span>
+                </div>
+              </div>
+
+              <!-- Selected Block Details Inspector -->
+              <div class="ram-inspector-details" id="hyp-block-details">
+                <span>Segment: <strong>0x00000000 - 0x000FFFFF</strong></span>
+                <span>Domain: <strong>Ring 0 Hypervisor Enclave</strong></span>
+                <span>Permissions: <strong>RO (Guest Disallowed)</strong></span>
+                <span>Status: <strong>GUARD_ARMED</strong></span>
+                <span>Entropy: <strong>0.05</strong></span>
+              </div>
+
+              <!-- Hypervisor Real-Time Security Audit Stream -->
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: bold; color: #000080;">Hypervisor Security &amp; Isolation Event Stream:</span>
+                  <button class="win95-btn" id="btn-hyp-clear-log" style="font-size: 0.62rem; padding: 1px 4px;">Clear Log</button>
+                </div>
+                <div class="hypervisor-log-feed" id="hyp-audit-log-feed">
+                  <div class="hypervisor-log-entry">[HYPERVISOR] Autonomous RAM Governance active. Protection domains established.</div>
+                </div>
+              </div>
+
+              <!-- Action Controls Bar -->
+              <div class="hypervisor-actions-bar">
+                <button class="win95-btn" id="btn-hyp-scrub-now" style="font-weight: bold; color: #000080;" title="Execute multi-pass cryptographic random + complement + zero wipe">🧹 Scrub &amp; Zero RAM</button>
+                <button class="win95-btn" id="btn-hyp-audit-now" title="Verify memory canaries and page table boundaries">🔍 Audit Integrity</button>
+                <button class="win95-btn" id="btn-hyp-quarantine-toggle" style="color: #800080;" title="Halt CPU execution and hold memory for inspection">⚠️ Quarantine Guest</button>
+                <button class="win95-btn" id="btn-hyp-export-dump" title="Export full memory protection map as text report">📄 Export Memory Dump</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Status Bar -->
+          <div class="v86-status-bar">
+            <span id="v86-status-text">Ready to Boot • WebAssembly 32-bit x86 CPU • VGA Framebuffer</span>
+            <span id="v86-status-audio">Audio: Sound Blaster 16</span>
+            <span id="v86-status-mouse">Mouse: PS/2 Relative</span>
+          </div>
+        </div>
+      </div>
+
       <!-- LLM-95 Hardware Scanner & Sealed VM OS Provisioning Wizard -->
       <div class="window resizable" id="setupWizard" style="width: 660px; height: 530px; display: none;">
         <div class="window-titlebar">
@@ -217,7 +665,7 @@
 
               <div class="wizard-download-status-card">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                  <span style="font-weight: bold;" id="wiz-download-model-label">Llama-3.2-3B-Instruct-Q4_K_M.gguf</span>
+                  <span style="font-weight: bold;" id="wiz-download-model-label">Gemma-2-2B-it-Q4_K_M.gguf</span>
                   <span style="font-size: 0.72rem; color: #222;" id="wiz-download-stats">0% (0 / 2,020 MB) — 48 MB/s</span>
                 </div>
                 <div class="gauge-bar-outer" style="margin: 6px 0;">
@@ -249,19 +697,23 @@ Awaiting model payload stream...</pre>
 
               <fieldset class="win95-fieldset" style="margin-top: 8px;">
                 <legend class="win95-legend">Sealed Virtual Machine Configuration</legend>
-                <div class="status-row"><span>Operating System Brain:</span><strong id="wiz-final-model-name">Llama-3.2-3B-Instruct-Q4_K_M.gguf</strong></div>
+                <div class="status-row"><span>Operating System Brain:</span><strong id="wiz-final-model-name">Gemma-2-2B-it-Q4_K_M.gguf</strong></div>
                 <div class="status-row"><span>Storage Location:</span><code>/models/kernel-brain.gguf (Sealed VM Disk)</code></div>
                 <div class="status-row"><span>RAM Consumption:</span><span id="wiz-final-ram">~2.4 GB / 8.0 GB (5.6 GB free for user apps)</span></div>
                 <div class="status-row"><span>Hardware Virtualization:</span><span>macOS Tahoe Hypervisor (HVF)</span></div>
                 <div class="status-row"><span>Virtual Graphics:</span><span class="status-pill online">● VirtIO-GPU Metal 3 (120Hz HiDPI)</span></div>
                 <div class="status-row"><span>Virtual Sound:</span><span class="status-pill online">● VirtIO-Sound CoreAudio (48kHz Stereo)</span></div>
                 <div class="status-row"><span>Autonomous Operator:</span><span style="color: green; font-weight: bold;">PID 1 OS Pilot Active</span></div>
+                <div class="status-row" style="background: #FFFFCC; padding: 3px 6px; border: 1px dashed #999; margin-top: 4px;">
+                  <span>💾 Model Registry:</span>
+                  <span style="font-weight: bold; color: #000080;">Persisted to model-registry.json &amp; Browser Storage</span>
+                </div>
               </fieldset>
 
               <div style="margin: 8px 0; font-size: 0.75rem;">
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
                   <input type="checkbox" id="wiz-remember-choice" checked />
-                  <span>Remember my configuration and launch directly into LLM-95 OS on future boots</span>
+                  <span><strong>Persist Model Registry:</strong> Automatically reload this model on subsequent system boots</span>
                 </label>
               </div>
 
@@ -286,6 +738,7 @@ Awaiting model payload stream...</pre>
         <div class="window-content">
           <div class="engine-tabs-header">
             <div class="engine-tab active" data-tab="tab-monitor">System & Health</div>
+            <div class="engine-tab" data-tab="tab-local-inference">⚡ Local Inference Connection</div>
             <div class="engine-tab" data-tab="tab-models">Model Registry</div>
             <div class="engine-tab" data-tab="tab-benchmark">Inference Sandbox</div>
             <div class="engine-tab" data-tab="tab-vm">VM & Container Export</div>
@@ -301,7 +754,7 @@ Awaiting model payload stream...</pre>
                 </div>
                 <div class="status-row">
                   <span>Active Model:</span>
-                  <strong id="active-model-name-label">Llama-3.2-3B-Instruct-Q4_K_M.gguf</strong>
+                  <strong id="active-model-name-label">Gemma-2-2B-it-Q4_K_M.gguf</strong>
                 </div>
                 <div class="status-row">
                   <span>Architecture:</span>
@@ -341,6 +794,78 @@ Awaiting model payload stream...</pre>
               <div id="raw-health-display" class="win95-terminal" style="display: none; height: 90px; overflow-y: auto; margin-top: 4px;"></div>
             </div>
 
+            <!-- Tab: Local Inference Connection & Universal Auto-Detection -->
+            <div class="tab-pane" id="tab-local-inference">
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">⚡ Universal Local Inference Auto-Detection</legend>
+                <div class="status-row">
+                  <span>Connection Status:</span>
+                  <span class="status-pill detecting" id="inference-status-pill">● AUTO-DETECTING CONNECTION...</span>
+                </div>
+                <div class="status-row">
+                  <span>Detected Engine:</span>
+                  <strong id="inference-engine-name" style="color: #000080;">Scanning ports (11434, 1234, 8080, 8000)...</strong>
+                </div>
+                <div class="status-row">
+                  <span>Active Endpoint:</span>
+                  <code id="inference-endpoint-url" style="background: white; padding: 1px 4px; border: 1px solid #999;">Detecting...</code>
+                </div>
+                <div class="status-row">
+                  <span>Round-Trip Latency:</span>
+                  <strong id="inference-latency-display">-- ms</strong>
+                </div>
+                <div class="status-row">
+                  <span>Universal Compatibility:</span>
+                  <span style="color: #006600; font-weight: bold;">Ollama • LM Studio • llama.cpp • vLLM • LocalAI • Direct &amp; Proxy</span>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                  <button class="win95-btn" id="btn-detect-inference" style="font-weight: bold; color: #000080;">🔍 Scan &amp; Auto-Detect Now</button>
+                  <button class="win95-btn" id="btn-test-inference">⚡ Test Inference Handshake</button>
+                  <button class="win95-btn" id="btn-toggle-inference-raw">📄 View Connection Details</button>
+                </div>
+                <div id="inference-raw-details" class="win95-terminal" style="display: none; height: 95px; overflow-y: auto; margin-top: 6px; font-size: 0.7rem;"></div>
+              </fieldset>
+
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Manual Connection &amp; Custom Endpoint Override</legend>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.75rem; width: 90px;">Target URL:</span>
+                    <input type="text" id="custom-inference-url-input" placeholder="e.g. http://127.0.0.1:11434 or http://localhost:1234" style="flex-grow: 1; font-family: monospace; font-size: 0.75rem; padding: 2px 4px;" />
+                    <button class="win95-btn" id="btn-apply-inference-url">Connect</button>
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.75rem; width: 90px;">Engine Type:</span>
+                    <select id="inference-engine-type-select" style="flex-grow: 1; font-size: 0.75rem; padding: 2px;">
+                      <option value="auto">Auto-Detect Protocol (Recommended)</option>
+                      <option value="ollama">Ollama (/api/generate &amp; /api/tags)</option>
+                      <option value="lmstudio">LM Studio (/v1/chat/completions)</option>
+                      <option value="llama_cpp">llama.cpp server (/completion &amp; /health)</option>
+                      <option value="openai_generic">OpenAI-Compatible Local Server</option>
+                      <option value="standby">Sealed On-Device Synthetic Core (Air-Gapped)</option>
+                    </select>
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.75rem; width: 90px;">Active Model:</span>
+                    <select id="inference-model-select" style="flex-grow: 1; font-size: 0.75rem; padding: 2px;">
+                      <option value="">(Auto-detecting available models from local engine...)</option>
+                    </select>
+                    <button class="win95-btn" id="btn-refresh-inference-models" title="Refresh model list from local inference">🔄 Refresh</button>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">Quick Setup Tips for Local Inference</legend>
+                <div style="font-size: 0.72rem; line-height: 1.4; color: #222;">
+                  <div>• <strong>Ollama (Port 11434):</strong> Run with <code>OLLAMA_ORIGINS="*" ollama serve</code> to enable universal browser/VM access.</div>
+                  <div>• <strong>LM Studio (Port 1234):</strong> Go to <em>Developer tab &gt; Local Inference Server &gt; Enable CORS &gt; Start Server</em>.</div>
+                  <div>• <strong>llama.cpp / llamafile (Port 8080):</strong> Start with <code>./llama-server -m &lt;model.gguf&gt; --port 8080 --host 0.0.0.0</code>.</div>
+                  <div>• <strong>VM / Container Host Bridge:</strong> If running inside a VM or container, the host machine is accessible at <code>http://10.0.2.2:11434</code> or <code>http://host.docker.internal:11434</code>.</div>
+                </div>
+              </fieldset>
+            </div>
+
             <!-- Tab 2: Models -->
             <div class="tab-pane" id="tab-models">
               <fieldset class="win95-fieldset">
@@ -364,9 +889,41 @@ Awaiting model payload stream...</pre>
                 </table>
               </fieldset>
               <fieldset class="win95-fieldset">
+                <legend class="win95-legend">💾 Persistent Model Registry (model-registry.json)</legend>
+                <div class="status-row">
+                  <span>Registry Status:</span>
+                  <span class="status-pill online" id="reg-status-pill">● ACTIVE &amp; PERSISTED</span>
+                </div>
+                <div class="status-row">
+                  <span>Storage Backend:</span>
+                  <strong style="color: #000080;">model-registry.json + Browser LocalStorage</strong>
+                </div>
+                <div class="status-row">
+                  <span>Auto-Reload on Boot:</span>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; font-weight: bold; cursor: pointer;">
+                    <input type="checkbox" id="reg-autoreload-chk" checked />
+                    <span id="reg-autoreload-label">Enabled (Automatically reloads last selected model)</span>
+                  </label>
+                </div>
+                <div class="status-row">
+                  <span>Boot Count:</span>
+                  <span id="reg-boot-count">Boot #1</span>
+                </div>
+                <div class="status-row">
+                  <span>Last Registry Update:</span>
+                  <span id="reg-last-updated" style="font-size: 0.72rem; color: #555;">Today</span>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                  <button class="win95-btn" id="btn-reload-from-registry">🔄 Reload from Registry</button>
+                  <button class="win95-btn" id="btn-toggle-view-registry">📄 View model-registry.json</button>
+                  <button class="win95-btn" id="btn-relaunch-wizard-tab" style="margin-left: auto;">⚙️ Setup Wizard</button>
+                </div>
+                <div id="registry-json-display" class="win95-terminal" style="display: none; height: 110px; overflow-y: auto; margin-top: 6px; font-size: 0.72rem;"></div>
+              </fieldset>
+              <fieldset class="win95-fieldset">
                 <legend class="win95-legend">Custom Model Path (MODEL_PATH)</legend>
                 <div style="display: flex; gap: 4px;">
-                  <input type="text" id="custom-model-input" value="/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf" style="flex-grow: 1; font-family: monospace; font-size: 0.75rem; padding: 2px;" />
+                  <input type="text" id="custom-model-input" value="/models/Gemma-2-2B-it-Q4_K_M.gguf" style="flex-grow: 1; font-family: monospace; font-size: 0.75rem; padding: 2px;" />
                   <button class="win95-btn" id="btn-apply-model-path">Load Path</button>
                 </div>
               </fieldset>
@@ -392,25 +949,38 @@ Awaiting model payload stream...</pre>
             <!-- Tab 4: VM & Appliance -->
             <div class="tab-pane" id="tab-vm">
               <fieldset class="win95-fieldset">
-                <legend class="win95-legend">Virtual Machine Appliance Specs</legend>
-                <div style="font-size: 0.75rem; line-height: 1.4;">
-                  <div>• <strong>Appliance Disk Image:</strong> <code>llama95-vm.qcow2</code> (Max 8.0 GB footprint)</div>
-                  <div>• <strong>Hypervisor Support:</strong> QEMU/KVM, VirtualBox, Proxmox VE, VMware</div>
-                  <div>• <strong>Runtime Stack:</strong> Alpine Linux 3.20 + llama.cpp + Node.js 20</div>
-                  <div>• <strong>Kiosk Shell:</strong> Cage Wayland compositor wrapping Chromium fullscreen</div>
+                <legend class="win95-legend">🖥️ Sealed OS Virtual Machine Appliance Specs</legend>
+                <div style="font-size: 0.73rem; line-height: 1.45;">
+                  <div>• <strong>Appliance Disk Image:</strong> <code>llama95-vm.qcow2</code> (Max 8.0 GB dynamic sparse footprint)</div>
+                  <div>• <strong>Bootloader:</strong> Dual GRUB 2 (UEFI/GPT) + Syslinux / ISOLINUX (BIOS/MBR) with 6 boot entries</div>
+                  <div>• <strong>Kernel Init (PID 1):</strong> Standalone <code>/init</code> mounting devtmpfs, probing VirtIO, configuring ALSA CoreAudio</div>
+                  <div>• <strong>Hypervisor Acceleration:</strong> Apple Silicon HVF (macOS Tahoe), Linux KVM, UTM, Proxmox, VMware</div>
+                  <div>• <strong>VirtIO Subsystems:</strong> VirtIO-GPU (Metal 3), VirtIO-Sound (CoreAudio 48kHz 512-frame buffer), VirtIO-Net, VirtIO-Balloon</div>
                 </div>
               </fieldset>
+
+              <fieldset class="win95-fieldset">
+                <legend class="win95-legend">📦 Bootloader &amp; Contained VM Architecture</legend>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px;">
+                  <button class="win95-btn" id="btn-view-grub" style="font-weight: bold; color: #000080;">📜 View GRUB 2 (grub.cfg)</button>
+                  <button class="win95-btn" id="btn-view-init" style="font-weight: bold; color: #000080;">⚙️ View Kernel Init (/init)</button>
+                  <button class="win95-btn" id="btn-view-qemu-script">🚀 View run-macos-tahoe.sh</button>
+                  <button class="win95-btn" id="btn-bundle-vm">📦 Bundle VM Package</button>
+                </div>
+                <div class="win95-terminal" id="vm-inspect-viewer" style="user-select: all; height: 110px; overflow-y: auto; font-size: 0.68rem; font-family: monospace; white-space: pre-wrap;">Select a bootloader or appliance script above to inspect its configuration...</div>
+              </fieldset>
+
               <fieldset class="win95-fieldset" style="flex-grow: 1;">
-                <legend class="win95-legend">Launch & Build Commands</legend>
-                <div class="win95-terminal" id="vm-qemu-command" style="user-select: all; height: 90px;">qemu-system-x86_64 \
-  -enable-kvm -m 8G -smp 4 \
-  -drive file=build-output/llama95-vm.qcow2,format=qcow2 \
-  -net nic,model=virtio -net user,hostfwd=tcp::3000-:3000 \
-  -vga virtio</div>
-                <div style="display: flex; gap: 6px; margin-top: 6px;">
-                  <button class="win95-btn" id="btn-copy-qemu">Copy QEMU Command</button>
-                  <button class="win95-btn" id="btn-copy-podman">Podman Run Command</button>
-                  <button class="win95-btn" id="btn-view-readme">View README.md</button>
+                <legend class="win95-legend">🚀 Launch &amp; Build Commands</legend>
+                <div class="win95-terminal" id="vm-qemu-command" style="user-select: all; height: 75px; font-size: 0.7rem; font-family: monospace;">./run-macos-tahoe.sh build-output/llama95-vm.qcow2 \
+  -M virt,accel=hvf -cpu host -smp 4 -m 8G \
+  -device virtio-gpu-gl-pci -audiodev coreaudio,id=snd0,out.buffer-length=512 \
+  -device virtio-snd-pci,audiodev=snd0 -netdev user,id=net0,hostfwd=tcp::3000-:3000</div>
+                <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                  <button class="win95-btn" id="btn-copy-qemu">Copy Tahoe QEMU Command</button>
+                  <button class="win95-btn" id="btn-copy-podman">Copy Podman Command</button>
+                  <button class="win95-btn" id="btn-copy-utm">Copy UTM Config</button>
+                  <button class="win95-btn" id="btn-view-readme">View Full Documentation</button>
                 </div>
               </fieldset>
             </div>
@@ -443,36 +1013,82 @@ Awaiting model payload stream...</pre>
         </div>
       </div>
 
-      <div class="window resizable" id="chrome">
+      <div class="window resizable" id="chrome" style="width: 780px; height: 560px; min-width: 500px; min-height: 380px;">
         <div class="window-titlebar">
-          <span class="window-title">Chrome</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <img src="https://storage.googleapis.com/gemini-95-icons/chrome-icon-2.png" alt="" style="width: 14px; height: 14px;" />
+            <span class="window-title" id="browser-window-title">Chrome - World Wide Web Browser</span>
+          </div>
           <div class="window-controls">
             <div class="window-minimize window-control-button">−</div>
             <div class="window-close window-control-button">✕</div>
           </div>
         </div>
-        <div class="window-content">
-          <div class="browser-toolbar">
+        <div class="window-content browser-content-layout">
+          <!-- Browser Navigation & Command Toolbar -->
+          <div class="browser-nav-toolbar">
+            <div class="browser-nav-buttons">
+              <button class="win95-btn browser-nav-btn" id="btn-browser-back" title="Back (Alt+Left)" disabled>◀ Back</button>
+              <button class="win95-btn browser-nav-btn" id="btn-browser-forward" title="Forward (Alt+Right)" disabled>▶ Fwd</button>
+              <button class="win95-btn browser-nav-btn" id="btn-browser-reload" title="Reload (F5)">🔄 Refresh</button>
+              <button class="win95-btn browser-nav-btn" id="btn-browser-home" title="Home">🏠 Home</button>
+            </div>
+
+            <!-- Address Bar Container with SSL badge and Firewall status -->
             <div class="address-bar-container">
+              <span id="browser-ssl-badge" class="browser-ssl-badge secure" title="Secure TLS Encrypted Connection (HTTPS)">🔒 HTTPS</span>
               <input
                 type="text"
                 class="browser-address-bar"
-                placeholder="Enter a website URL..."
-                value="https://www.google.com"
+                id="browser-address-input"
+                placeholder="Enter URL or search internet (e.g. wikipedia.org, google.com)..."
+                value="https://en.wikipedia.org/wiki/Main_Page"
+                autocomplete="off"
+                spellcheck="false"
               />
-              <button class="browser-go-button">Go!</button>
+              <button class="win95-btn browser-go-button" id="browser-go-btn">Go!</button>
+              <button class="browser-firewall-chip" id="browser-firewall-status-btn" title="Protected by macOS Application Firewall - Click to configure firewall rules">
+                <span id="browser-firewall-dot" class="firewall-dot active">●</span> 🛡️ Firewall: Active
+              </button>
             </div>
           </div>
+
+          <!-- Quick Bookmark Links Bar -->
+          <div class="browser-bookmark-bar">
+            <span class="bookmark-label">Bookmarks:</span>
+            <button class="win95-btn bookmark-btn" data-url="https://en.wikipedia.org/wiki/Main_Page">📖 Wikipedia</button>
+            <button class="win95-btn bookmark-btn" data-url="https://news.ycombinator.com">📰 Hacker News</button>
+            <button class="win95-btn bookmark-btn" data-url="https://www.w3.org">📜 W3C Specs</button>
+            <button class="win95-btn bookmark-btn" data-url="https://archive.org">🕹️ Internet Archive</button>
+            <button class="win95-btn bookmark-btn" data-url="https://html.duckduckgo.com/html/?q=retro+computing">🦆 DuckDuckGo</button>
+            <button class="win95-btn bookmark-btn" data-url="https://github.com">💻 GitHub</button>
+          </div>
+
+          <!-- Browser Viewport with Real Internet Iframe -->
           <div class="browser-viewport">
             <iframe
               id="browser-frame"
-              src="https://web.archive.org/web/19990428171538/http://google.com/"
+              src="/api/proxy?url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FMain_Page"
               width="100%"
               height="100%"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             ></iframe>
-            <div class="browser-loading">
-              Generating website...
+            <div class="browser-loading" id="browser-loading-spinner" style="display: none;">
+              <div class="browser-spinner-box">
+                <div class="browser-spinner-icon">🌐</div>
+                <div id="browser-loading-text">Connecting to remote web server...</div>
+                <div class="gauge-bar-outer" style="width: 180px; margin-top: 6px;">
+                  <div class="gauge-bar-fill" id="browser-loading-bar" style="width: 45%;"></div>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Bottom Retro Browser Status Bar -->
+          <div class="browser-status-bar">
+            <span id="browser-status-text">● Done (Surfing live internet through VirtIO Web Gateway)</span>
+            <span id="browser-security-status" class="status-sec-badge">🔒 256-bit TLS Passthrough</span>
+            <span id="browser-packet-status" class="status-fw-badge">🛡️ Packet Filter: PASS</span>
           </div>
         </div>
       </div>
@@ -705,6 +1321,7 @@ Type 'help' for command list.
                 <div class="status-row"><span>Host Pipeline:</span><span class="status-pill online">● macOS CoreAudio 48,000 Hz Stereo</span></div>
                 <div class="status-row"><span>Latency Buffer:</span><strong>512 frames (~10.6ms) Zero-Jitter</strong></div>
                 <div class="status-row"><span>Compatibility:</span><span>Sound Blaster 16 Emulation on IRQ 5</span></div>
+                <div class="status-row"><span>Master Volume:</span><strong id="driver-tab-volume-status">80% (Active)</strong></div>
                 <button class="win95-btn" id="btn-play-test-sound" style="margin-top: 6px;">🔊 Play 48kHz Test Chime</button>
               </fieldset>
             </div>
@@ -809,10 +1426,681 @@ Type 'help' for command list.
         </div>
       </div>
 
+      <!-- Advanced System Sound Mixer: Volume Control (sndvol32.exe) -->
+      <div class="window resizable" id="volumeControl" style="width: 730px; height: 500px; min-width: 580px; min-height: 420px; display: none;">
+        <div class="window-titlebar">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <img src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png" alt="" style="width: 14px; height: 14px;" />
+            <span class="window-title">Volume Control</span>
+          </div>
+          <div class="window-controls">
+            <div class="window-minimize window-control-button">−</div>
+            <div class="window-close window-control-button">✕</div>
+          </div>
+        </div>
+        
+        <!-- Win95 Menu Bar -->
+        <div class="win95-menu-bar">
+          <div class="win95-menu-item" id="mixer-menu-options" tabindex="0">
+            Options
+            <div class="win95-dropdown-menu" id="mixer-dropdown-options" style="display: none;">
+              <div class="dropdown-item" id="mixer-opt-properties">Properties...</div>
+              <div class="dropdown-item" id="mixer-opt-advanced">Advanced Controls</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="mixer-opt-exit">Exit</div>
+            </div>
+          </div>
+          <div class="win95-menu-item" id="mixer-menu-mode" tabindex="0">
+            Mode
+            <div class="win95-dropdown-menu" id="mixer-dropdown-mode" style="display: none;">
+              <div class="dropdown-item active-check" id="mixer-mode-playback">✓ Playback Controls</div>
+              <div class="dropdown-item" id="mixer-mode-recording">Recording Controls</div>
+              <div class="dropdown-item" id="mixer-mode-all">Show All Channels</div>
+            </div>
+          </div>
+          <div class="win95-menu-item" id="mixer-menu-help" tabindex="0">
+            Help
+            <div class="win95-dropdown-menu" id="mixer-dropdown-help" style="display: none;">
+              <div class="dropdown-item" id="mixer-help-topics">Help Topics</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" id="mixer-help-about">About Volume Control...</div>
+            </div>
+          </div>
+          <div class="mixer-menu-device-info">
+            <span>Device: <strong>VirtIO-Sound CoreAudio (48kHz)</strong></span>
+          </div>
+        </div>
 
-      <!-- Start Menu -->
-      <div class="start-menu" id="start-menu">
-        <div class="start-menu-item" data-app="setupWizard">⚙️ Hardware Setup &amp; Sealed OS Wizard</div>
+        <div class="window-content mixer-window-content">
+          <!-- Toolbar with Mode Quick Selectors & Actions -->
+          <div class="mixer-toolbar">
+            <div class="mixer-toolbar-modes">
+              <span style="font-size: 0.72rem; font-weight: bold; margin-right: 2px;">Mixer Mode:</span>
+              <button class="win95-btn active" id="btn-mixer-tab-playback">🔊 Playback (Output)</button>
+              <button class="win95-btn" id="btn-mixer-tab-recording">🎙️ Recording (Input &amp; VU)</button>
+              <button class="win95-btn" id="btn-mixer-tab-devices">⚙️ Device Channels...</button>
+            </div>
+            <div class="mixer-toolbar-actions">
+              <button class="win95-btn" id="btn-mixer-test-all">🔊 Test Chime</button>
+              <button class="win95-btn" id="btn-mixer-mute-all" style="color: #800000;">🔇 Mute All</button>
+            </div>
+          </div>
+
+          <!-- Main Channels Strips Rack -->
+          <div class="mixer-channels-scroll-container">
+            <div class="mixer-channels-rack" id="mixer-channels-rack">
+
+              <!-- Channel 1: Master Output -->
+              <div class="mixer-channel-strip" id="channel-strip-master" data-channel="master">
+                <div class="channel-header">Volume Control</div>
+                <div class="channel-type-badge">Master Out</div>
+
+                <div class="channel-section">
+                  <div class="channel-section-label">Balance:</div>
+                  <div class="balance-slider-row">
+                    <span class="pan-tick-label">L</span>
+                    <input type="range" class="win95-horizontal-range channel-balance" id="mixer-balance-master" min="-100" max="100" value="0" />
+                    <span class="pan-tick-label">R</span>
+                  </div>
+                  <div class="pan-readout" id="mixer-pan-readout-master">Center</div>
+                </div>
+
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Volume:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>0dB</span>
+                      <span>Min</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-master" min="0" max="100" value="80" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-master">80% (-2.5 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <label class="win95-checkbox-container" for="mixer-mute-master">
+                    <input type="checkbox" id="mixer-mute-master" />
+                    <span class="mute-text">Mute all</span>
+                  </label>
+                  <button class="win95-btn channel-solo-btn" id="mixer-test-master" title="Test Master Out">🔊 Ping</button>
+                </div>
+              </div>
+
+              <!-- Channel 2: Wave / Synthesizer -->
+              <div class="mixer-channel-strip" id="channel-strip-wave" data-channel="wave">
+                <div class="channel-header">Wave / Synth</div>
+                <div class="channel-type-badge">WebAudio PCM</div>
+
+                <div class="channel-section">
+                  <div class="channel-section-label">Balance:</div>
+                  <div class="balance-slider-row">
+                    <span class="pan-tick-label">L</span>
+                    <input type="range" class="win95-horizontal-range channel-balance" id="mixer-balance-wave" min="-100" max="100" value="0" />
+                    <span class="pan-tick-label">R</span>
+                  </div>
+                  <div class="pan-readout" id="mixer-pan-readout-wave">Center</div>
+                </div>
+
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Volume:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>0dB</span>
+                      <span>Min</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-wave" min="0" max="100" value="85" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-wave">85% (-1.8 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <label class="win95-checkbox-container" for="mixer-mute-wave">
+                    <input type="checkbox" id="mixer-mute-wave" />
+                    <span class="mute-text">Mute</span>
+                  </label>
+                  <button class="win95-btn channel-solo-btn" id="mixer-test-wave" title="Test 440Hz Triangle Wave">🎵 Tone</button>
+                </div>
+              </div>
+
+              <!-- Channel 3: VirtIO Neural Audio / System Speech -->
+              <div class="mixer-channel-strip" id="channel-strip-speech" data-channel="speech">
+                <div class="channel-header">VirtIO Neural</div>
+                <div class="channel-type-badge">Speech &amp; Chime</div>
+
+                <div class="channel-section">
+                  <div class="channel-section-label">Balance:</div>
+                  <div class="balance-slider-row">
+                    <span class="pan-tick-label">L</span>
+                    <input type="range" class="win95-horizontal-range channel-balance" id="mixer-balance-speech" min="-100" max="100" value="0" />
+                    <span class="pan-tick-label">R</span>
+                  </div>
+                  <div class="pan-readout" id="mixer-pan-readout-speech">Center</div>
+                </div>
+
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Volume:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>0dB</span>
+                      <span>Min</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-speech" min="0" max="100" value="75" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-speech">75% (-3.5 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <label class="win95-checkbox-container" for="mixer-mute-speech">
+                    <input type="checkbox" id="mixer-mute-speech" />
+                    <span class="mute-text">Mute</span>
+                  </label>
+                  <button class="win95-btn channel-solo-btn" id="mixer-test-speech" title="Test Neural Sound">🤖 Beep</button>
+                </div>
+              </div>
+
+              <!-- Channel 4: Line In / CD Audio / Media -->
+              <div class="mixer-channel-strip" id="channel-strip-cd" data-channel="cd">
+                <div class="channel-header">CD / Line In</div>
+                <div class="channel-type-badge">Aux Playback</div>
+
+                <div class="channel-section">
+                  <div class="channel-section-label">Balance:</div>
+                  <div class="balance-slider-row">
+                    <span class="pan-tick-label">L</span>
+                    <input type="range" class="win95-horizontal-range channel-balance" id="mixer-balance-cd" min="-100" max="100" value="0" />
+                    <span class="pan-tick-label">R</span>
+                  </div>
+                  <div class="pan-readout" id="mixer-pan-readout-cd">Center</div>
+                </div>
+
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Volume:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>0dB</span>
+                      <span>Min</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-cd" min="0" max="100" value="70" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-cd">70% (-4.2 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <label class="win95-checkbox-container" for="mixer-mute-cd">
+                    <input type="checkbox" id="mixer-mute-cd" />
+                    <span class="mute-text">Mute</span>
+                  </label>
+                  <button class="win95-btn channel-solo-btn" id="mixer-test-cd" title="Test CD Chime">💿 Chime</button>
+                </div>
+              </div>
+
+              <!-- Channel 5: Virtual Microphone (Input Gain & Live Level VU Monitor) -->
+              <div class="mixer-channel-strip input-channel" id="channel-strip-mic" data-channel="mic">
+                <div class="channel-header">Virtual Mic</div>
+                <div class="channel-type-badge input-badge">Input / VU Meter</div>
+
+                <!-- Input Level Meter (VU Bar) -->
+                <div class="channel-section vu-section">
+                  <div class="channel-section-label">Input Level:</div>
+                  <div class="vu-meter-container">
+                    <div class="vu-scale-labels">
+                      <span style="color: #a00;">0dB</span>
+                      <span style="color: #990;">-6</span>
+                      <span>-18</span>
+                      <span>-36</span>
+                    </div>
+                    <div class="vu-meter-bars-row">
+                      <div class="vu-led-column" id="vu-meter-leds">
+                        <div class="vu-led-segment red" data-level="12"></div>
+                        <div class="vu-led-segment red" data-level="11"></div>
+                        <div class="vu-led-segment yellow" data-level="10"></div>
+                        <div class="vu-led-segment yellow" data-level="9"></div>
+                        <div class="vu-led-segment green" data-level="8"></div>
+                        <div class="vu-led-segment green" data-level="7"></div>
+                        <div class="vu-led-segment green" data-level="6"></div>
+                        <div class="vu-led-segment green" data-level="5"></div>
+                        <div class="vu-led-segment green" data-level="4"></div>
+                        <div class="vu-led-segment green" data-level="3"></div>
+                        <div class="vu-led-segment green" data-level="2"></div>
+                        <div class="vu-led-segment green" data-level="1"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vu-numeric-readout" id="vu-numeric-readout">-48.0 dBFS</div>
+                </div>
+
+                <!-- Input Gain Fader -->
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Input Gain:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>+12dB</span>
+                      <span>0dB</span>
+                      <span>Off</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-mic" min="0" max="100" value="75" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-mic">75% (+3 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <div style="display: flex; flex-direction: column; gap: 3px; width: 100%;">
+                    <label class="win95-checkbox-container" for="mixer-mute-mic">
+                      <input type="checkbox" id="mixer-mute-mic" />
+                      <span class="mute-text">Mute Mic</span>
+                    </label>
+                    <label class="win95-checkbox-container" for="mixer-boost-mic" title="Mic Boost (+20 dB analog pre-amp emulation)">
+                      <input type="checkbox" id="mixer-boost-mic" checked />
+                      <span class="mute-text">+20dB Boost</span>
+                    </label>
+                    <label class="win95-checkbox-container" for="mixer-monitor-mic" title="Listen to this mic through Master Output">
+                      <input type="checkbox" id="mixer-monitor-mic" />
+                      <span class="mute-text">Monitor Mic</span>
+                    </label>
+                  </div>
+                  <div style="display: flex; gap: 3px; margin-top: 4px; width: 100%;">
+                    <button class="win95-btn" id="mixer-toggle-mic-source" style="font-size: 0.65rem; padding: 2px 3px; flex-grow: 1;">🎙️ Test Voice</button>
+                    <button class="win95-btn" id="mixer-real-mic-btn" style="font-size: 0.65rem; padding: 2px 3px;" title="Use Real Microphone Hardware">🔴 Real</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Channel 6: PC Speaker / Synthesizer Beeps -->
+              <div class="mixer-channel-strip" id="channel-strip-pcspk" data-channel="pcspk">
+                <div class="channel-header">PC Speaker</div>
+                <div class="channel-type-badge">8254 Timer</div>
+
+                <div class="channel-section">
+                  <div class="channel-section-label">Balance:</div>
+                  <div class="balance-slider-row">
+                    <span class="pan-tick-label">L</span>
+                    <input type="range" class="win95-horizontal-range channel-balance" id="mixer-balance-pcspk" min="-100" max="100" value="0" />
+                    <span class="pan-tick-label">R</span>
+                  </div>
+                  <div class="pan-readout" id="mixer-pan-readout-pcspk">Center</div>
+                </div>
+
+                <div class="channel-section fader-section">
+                  <div class="channel-section-label">Volume:</div>
+                  <div class="fader-wrapper">
+                    <div class="fader-ticks">
+                      <span>Max</span>
+                      <span>0dB</span>
+                      <span>Min</span>
+                    </div>
+                    <div class="fader-track">
+                      <input type="range" class="win95-vertical-range channel-fader" id="mixer-fader-pcspk" min="0" max="100" value="60" orient="vertical" />
+                    </div>
+                  </div>
+                  <div class="volume-db-badge" id="mixer-db-pcspk">60% (-6.0 dB)</div>
+                </div>
+
+                <div class="channel-footer">
+                  <label class="win95-checkbox-container" for="mixer-mute-pcspk">
+                    <input type="checkbox" id="mixer-mute-pcspk" />
+                    <span class="mute-text">Mute</span>
+                  </label>
+                  <button class="win95-btn channel-solo-btn" id="mixer-test-pcspk" title="Test DOS 8254 Beep">📢 Beep</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Properties Panel Modal: Toggle Specific Device Channels -->
+          <div class="mixer-properties-panel" id="mixer-properties-panel" style="display: none;">
+            <div class="win95-fieldset" style="background: #C0C0C0; padding: 10px;">
+              <legend class="win95-legend">Sound Device Properties &amp; Channel Visibility</legend>
+              <div style="font-size: 0.74rem; margin-bottom: 8px;">
+                <strong>Device:</strong> macOS Tahoe VirtIO-Sound (virtio-snd-pci / ALSA)
+              </div>
+
+              <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+                <div style="min-width: 140px;">
+                  <div style="font-weight: bold; font-size: 0.72rem; margin-bottom: 6px;">Adjust volume for:</div>
+                  <label class="win95-radio-label">
+                    <input type="radio" name="mixer-radio-mode" id="radio-mode-playback" checked /> Playback
+                  </label>
+                  <label class="win95-radio-label">
+                    <input type="radio" name="mixer-radio-mode" id="radio-mode-recording" /> Recording
+                  </label>
+                  <label class="win95-radio-label">
+                    <input type="radio" name="mixer-radio-mode" id="radio-mode-other" /> Other (VirtIO Bus)
+                  </label>
+                </div>
+
+                <div style="flex-grow: 1;">
+                  <div style="font-weight: bold; font-size: 0.72rem; margin-bottom: 6px;">Show the following volume controls:</div>
+                  <div class="channel-toggles-list">
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-master" checked />
+                      <span>Volume Control (Master Output)</span>
+                    </label>
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-wave" checked />
+                      <span>Wave / Audio Synthesizer</span>
+                    </label>
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-speech" checked />
+                      <span>VirtIO Neural Audio / Speech</span>
+                    </label>
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-cd" checked />
+                      <span>Line In / CD Audio / Media</span>
+                    </label>
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-mic" checked />
+                      <span>Virtual Microphone (Input &amp; VU)</span>
+                    </label>
+                    <label class="win95-checkbox-container">
+                      <input type="checkbox" id="toggle-chan-pcspk" checked />
+                      <span>PC Speaker / Timer Beeps</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                <button class="win95-btn" id="btn-properties-ok" style="font-weight: bold; min-width: 70px;">OK</button>
+                <button class="win95-btn" id="btn-properties-cancel" style="min-width: 70px;">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- About Volume Control Modal -->
+          <div class="mixer-modal-dialog" id="mixer-about-dialog" style="display: none;">
+            <div class="window-titlebar" style="padding: 2px 4px;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <img src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png" alt="" style="width: 14px; height: 14px;" />
+                <span class="window-title" style="font-size: 0.76rem;">About Volume Control</span>
+              </div>
+              <div class="window-controls">
+                <div class="window-close window-control-button" id="mixer-about-close" style="width: 14px; height: 14px; line-height: 12px; font-size: 10px;">✕</div>
+              </div>
+            </div>
+            <div style="padding: 12px; background: #C0C0C0; font-size: 0.74rem; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <img src="https://win98icons.alexmeub.com/icons/png/loudspeaker_rays-0.png" alt="" style="width: 36px; height: 36px;" />
+                <div>
+                  <div style="font-weight: bold; font-size: 0.82rem; color: #000080;">Volume Control (sndvol32.exe)</div>
+                  <div style="color: #333;">LLM-95 Advanced System Sound Mixer v4.10</div>
+                  <div style="color: #555; font-size: 0.68rem; margin-top: 2px;">VirtIO-Sound CoreAudio (48kHz Stereo ALSA/PCI Bridge)</div>
+                </div>
+              </div>
+              <div class="win95-fieldset" style="padding: 6px 8px; font-size: 0.7rem; line-height: 1.4; background: #E0E0E0;">
+                <div>• <strong>Output Gain:</strong> Independent multi-channel PCM faders &amp; stereo balance</div>
+                <div>• <strong>Virtual Microphone:</strong> Live 12-segment peak VU meter &amp; +20dB boost</div>
+                <div>• <strong>Channel Strip Visibility:</strong> Dynamic device channel toggling</div>
+                <div>• <strong>Hardware Audio:</strong> VirtIO Sound Subsystem (QEMU, UTM &amp; Host)</div>
+              </div>
+              <div style="font-size: 0.68rem; color: #444; text-align: center;">
+                Copyright &copy; 1995-2026 LLM-95 Operating System Project
+              </div>
+              <div style="display: flex; justify-content: center; margin-top: 4px;">
+                <button class="win95-btn" id="mixer-about-ok" style="font-weight: bold; min-width: 75px;">OK</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Volume Control Help Topics Modal -->
+          <div class="mixer-modal-dialog" id="mixer-help-dialog" style="display: none; max-width: 480px;">
+            <div class="window-titlebar" style="padding: 2px 4px;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <img src="https://win98icons.alexmeub.com/icons/png/help_book_cool-0.png" alt="" style="width: 14px; height: 14px;" />
+                <span class="window-title" style="font-size: 0.76rem;">Volume Control Help Topics</span>
+              </div>
+              <div class="window-controls">
+                <div class="window-close window-control-button" id="mixer-help-close" style="width: 14px; height: 14px; line-height: 12px; font-size: 10px;">✕</div>
+              </div>
+            </div>
+            <div style="padding: 12px; background: #C0C0C0; font-size: 0.74rem; display: flex; flex-direction: column; gap: 8px;">
+              <div class="win95-fieldset" style="padding: 8px; font-size: 0.72rem; line-height: 1.45; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 2px inset #808080;">
+                <div style="font-weight: bold; color: #000080; margin-bottom: 4px;">🎛️ Adjusting Volume &amp; Gain:</div>
+                <div style="margin-bottom: 6px;">Drag the vertical slider up or down for any channel to independently adjust output gain. Values are computed in authentic decibels (dB).</div>
+
+                <div style="font-weight: bold; color: #000080; margin-bottom: 4px;">⚖️ Stereo Balance &amp; Panning:</div>
+                <div style="margin-bottom: 6px;">Move the Balance slider left or right to pan audio. Double-click the slider track to reset directly to center.</div>
+
+                <div style="font-weight: bold; color: #000080; margin-bottom: 4px;">🎙️ Virtual Mic &amp; Real Hardware:</div>
+                <div style="margin-bottom: 6px;">The Virtual Microphone strip features a real-time 12-segment color-graded VU meter (Green &gt; Yellow &gt; Red clipping). Click "Test Voice" to simulate speech or "Real" to attach physical hardware microphone. Toggle "+20dB Boost" or "Monitor Mic" to listen through speakers.</div>
+
+                <div style="font-weight: bold; color: #000080; margin-bottom: 4px;">⚙️ Toggling Device Channels:</div>
+                <div>Open Options &gt; Properties or click "Device Channels..." on the toolbar to show or hide specific sound channels.</div>
+              </div>
+              <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                <button class="win95-btn" id="mixer-help-ok" style="font-weight: bold; min-width: 75px;">Close</button>
+              </div>
+            </div>
+          </div>
+
+              <!-- Bottom Status Bar -->
+              <div class="mixer-status-bar">
+                <span id="mixer-status-device">● VirtIO-Sound: 48kHz Stereo</span>
+                <span id="mixer-status-channels">Channels Active: 6/6</span>
+                <span id="mixer-status-mic">Mic: Virtual Neural Stream</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- macOS Application Firewall & Packet Filter Window -->
+          <div class="window resizable" id="firewallWindow" style="width: 660px; height: 520px; min-width: 540px; min-height: 420px; display: none;">
+            <div class="window-titlebar">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <img src="https://win98icons.alexmeub.com/icons/png/trust0-0.png" alt="" style="width: 14px; height: 14px;" />
+                <span class="window-title">Security &amp; Privacy: Application Firewall (macOS Tahoe)</span>
+              </div>
+              <div class="window-controls">
+                <div class="window-minimize window-control-button">−</div>
+                <div class="window-close window-control-button">✕</div>
+              </div>
+            </div>
+
+            <div class="window-content firewall-window-content">
+              <!-- Firewall Tabs Header -->
+              <div class="firewall-tabs-header">
+                <button class="firewall-tab active" data-tab="tab-fw-status">🛡️ Firewall</button>
+                <button class="firewall-tab" data-tab="tab-fw-apps">⚙️ Firewall Options (App Rules)</button>
+                <button class="firewall-tab" data-tab="tab-fw-domains">🚫 Domain Filter</button>
+                <button class="firewall-tab" data-tab="tab-fw-monitor">📊 Live Packet Monitor</button>
+              </div>
+
+              <!-- Firewall Tab Panes -->
+              <div class="firewall-tab-body">
+                <!-- Tab 1: Status & Master Switch -->
+                <div class="firewall-pane active" id="tab-fw-status">
+                  <div class="firewall-hero-card">
+                    <div class="firewall-hero-icon" id="firewall-status-shield">🛡️</div>
+                    <div class="firewall-hero-text">
+                      <div class="firewall-hero-title" id="firewall-status-title">Firewall: On</div>
+                      <div class="firewall-hero-desc" id="firewall-status-desc">The firewall is active and monitoring all incoming and outgoing connections to this system.</div>
+                    </div>
+                    <button class="win95-btn firewall-action-btn btn-turn-off" id="btn-firewall-master-toggle">Turn Off Firewall</button>
+                  </div>
+
+                  <fieldset class="win95-fieldset" style="margin-top: 10px;">
+                    <legend class="win95-legend">macOS Packet Filter &amp; Inbound Rules</legend>
+                    <div class="firewall-option-row">
+                      <label class="win95-checkbox-container" for="chk-firewall-block-all">
+                        <input type="checkbox" id="chk-firewall-block-all" />
+                        <span class="fw-opt-title">Block all incoming connections</span>
+                      </label>
+                      <div class="fw-opt-desc">Blocks all incoming connections except those required for basic Internet services, such as DHCP, Bonjour, and IPSec.</div>
+                    </div>
+
+                    <div class="firewall-option-row">
+                      <label class="win95-checkbox-container" for="chk-firewall-signed">
+                        <input type="checkbox" id="chk-firewall-signed" checked />
+                        <span class="fw-opt-title">Automatically allow built-in signed software to receive incoming connections</span>
+                      </label>
+                      <div class="fw-opt-desc">Allows built-in system software, VirtIO drivers, and on-device inference engines to connect to the network without confirmation prompts.</div>
+                    </div>
+
+                    <div class="firewall-option-row">
+                      <label class="win95-checkbox-container" for="chk-firewall-stealth">
+                        <input type="checkbox" id="chk-firewall-stealth" checked />
+                        <span class="fw-opt-title">Enable stealth mode</span>
+                      </label>
+                      <div class="fw-opt-desc">Don't respond to or acknowledge attempts to access this computer from the network using diagnostic tools like ping or ICMP echo.</div>
+                    </div>
+                  </fieldset>
+
+                  <div style="background: #eef2ff; border: 1px solid #c7d2fe; padding: 8px; margin-top: 8px; font-size: 0.72rem; color: #1e1b4b; border-radius: 4px;">
+                    <strong>ℹ️ Architecture Note:</strong> Operating in tandem with the Type-2 WebAssembly Hypervisor and VirtIO-Net packet queue. All Web Browser requests pass through this filter before hitting the network gateway.
+                  </div>
+                </div>
+
+                <!-- Tab 2: Application Rules -->
+                <div class="firewall-pane" id="tab-fw-apps">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="font-size: 0.75rem; color: #333;">Specify policies for applications and services:</div>
+                    <button class="win95-btn" id="btn-firewall-add-app" style="font-weight: bold;">+ Add Application...</button>
+                  </div>
+
+                  <div class="firewall-table-wrapper">
+                    <table class="firewall-table" id="firewall-apps-table">
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th>Application / Service</th>
+                          <th>Incoming Connections</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody id="firewall-apps-tbody">
+                        <!-- Populated dynamically via TS -->
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Add Application Modal Sheet -->
+                  <div id="firewall-add-app-modal" class="win95-modal-backdrop" style="display: none;">
+                    <div class="win95-modal-box">
+                      <div class="window-titlebar" style="margin: -6px -6px 8px -6px;">
+                        <span class="window-title">Add Application Firewall Rule</span>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem;">
+                        <div>
+                          <label>Application Name:</label>
+                          <input type="text" id="modal-app-name" placeholder="e.g. Node.js Runtime" style="width: 100%; padding: 2px;" />
+                        </div>
+                        <div>
+                          <label>Executable Path:</label>
+                          <input type="text" id="modal-app-path" placeholder="/usr/local/bin/node" style="width: 100%; padding: 2px; font-family: monospace;" />
+                        </div>
+                        <div>
+                          <label>Firewall Policy:</label>
+                          <select id="modal-app-action" style="width: 100%; padding: 2px;">
+                            <option value="allow">Allow incoming connections</option>
+                            <option value="block">Block incoming connections</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px;">
+                        <button class="win95-btn" id="btn-firewall-modal-cancel">Cancel</button>
+                        <button class="win95-btn wizard-primary-btn" id="btn-firewall-modal-save">Add Rule</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 3: Domain Filter & Blacklist -->
+                <div class="firewall-pane" id="tab-fw-domains">
+                  <div style="font-size: 0.75rem; margin-bottom: 6px; color: #333;">
+                    Block outgoing HTTP/HTTPS connections to specific hostnames, tracking servers, or malicious domains:
+                  </div>
+
+                  <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <input type="text" id="firewall-domain-input" placeholder="Enter domain to block (e.g. doubleclick.net, crypto-miner.com)..." style="flex-grow: 1; padding: 2px 4px; font-size: 0.75rem;" />
+                    <button class="win95-btn" id="btn-firewall-add-domain" style="font-weight: bold;">🚫 Block Domain</button>
+                  </div>
+
+                  <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 0.72rem; align-self: center; font-weight: bold;">Quick Presets:</span>
+                    <button class="win95-btn" id="btn-firewall-block-ads">+ Block Ad Trackers</button>
+                    <button class="win95-btn" id="btn-firewall-block-miners">+ Block Crypto Miners</button>
+                  </div>
+
+                  <fieldset class="win95-fieldset" style="flex-grow: 1; display: flex; flex-direction: column;">
+                    <legend class="win95-legend">Active Blocked Domains (${'<span id="blocked-domain-count">5</span>'})</legend>
+                    <div id="firewall-domains-list" class="firewall-domains-container">
+                      <!-- Domain chips populated via TS -->
+                    </div>
+                  </fieldset>
+                </div>
+
+                <!-- Tab 4: Live Packet Filter Monitor -->
+                <div class="firewall-pane" id="tab-fw-monitor">
+                  <div class="firewall-stats-ribbon">
+                    <div class="stat-box"><span class="stat-label">Inspected:</span><strong id="stat-packets-inspected">0</strong></div>
+                    <div class="stat-box"><span class="stat-label">Passed:</span><strong id="stat-packets-passed" style="color: #27ae60;">0</strong></div>
+                    <div class="stat-box"><span class="stat-label">Blocked:</span><strong id="stat-packets-blocked" style="color: #c0392b;">0</strong></div>
+                    <div class="stat-box"><span class="stat-label">Stealth Drops:</span><strong id="stat-packets-stealth" style="color: #d35400;">0</strong></div>
+                    <div class="stat-box"><span class="stat-label">Drop Rate:</span><strong id="stat-drop-rate">0.0%</strong></div>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0;">
+                    <div style="display: flex; gap: 4px;">
+                      <button class="win95-btn" id="btn-firewall-pause-logs">⏸ Pause Stream</button>
+                      <button class="win95-btn" id="btn-firewall-clear-logs">🗑 Clear</button>
+                      <button class="win95-btn" id="btn-firewall-export-logs">💾 Export Capture (.log)</button>
+                    </div>
+                    <button class="win95-btn" id="btn-firewall-test-ping" title="Send test ping to verify stealth mode">⚡ Test Diagnostic Ping</button>
+                  </div>
+
+                  <div class="firewall-monitor-table-wrapper">
+                    <table class="firewall-monitor-table">
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Proto</th>
+                          <th>Dir</th>
+                          <th>Application</th>
+                          <th>Destination</th>
+                          <th>Port</th>
+                          <th>Decision</th>
+                          <th>Reason / Filter Rule</th>
+                        </tr>
+                      </thead>
+                      <tbody id="firewall-packet-tbody">
+                        <!-- Live packet rows streamed here -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Authorization Lock Footer -->
+              <div class="firewall-lock-footer">
+                <button class="firewall-lock-button" id="firewall-lock-btn" type="button">
+                  <span id="firewall-lock-icon">🔓</span>
+                </button>
+                <span id="firewall-lock-text" class="firewall-lock-label">Click the lock to prevent further changes.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Start Menu -->
+          <div class="start-menu" id="start-menu">
+            <div class="start-menu-item" data-app="v86Window">🖥️ x86 Hardware Virtual Machine (v86 Wasm)</div>
+            <div class="start-menu-item" data-app="hypervisorWindow">🛡️ Hypervisor &amp; RAM Shield</div>
+            <div class="start-menu-item" data-app="firewallWindow">🛡️ Firewall (macOS Application Firewall)</div>
+            <div class="start-menu-item" data-app="setupWizard">⚙️ Hardware Setup &amp; Sealed OS Wizard</div>
+            <div class="start-menu-item" data-app="volumeControl">🎛️ Volume Control (Sound Mixer)</div>
         <div class="start-menu-item" data-app="gemini">🤖 LLM-95 OS Pilot</div>
         <div class="start-menu-item" data-app="terminalWindow">💻 MS-DOS Prompt</div>
         <div class="start-menu-item" data-app="packageManager">📦 Package Manager</div>
@@ -837,9 +2125,63 @@ Type 'help' for command list.
         </button>
         <div id="taskbar-apps">
         </div>
-        <div id="taskbar-tray">
-          <span class="taskbar-kernel-indicator" id="taskbar-kernel-indicator" title="Operating System Kernel: Sealed On-Device Model">● Sealed OS: Llama-3.2-3B</span>
+          <span class="taskbar-kernel-indicator" id="taskbar-kernel-indicator" title="Operating System Kernel: Click to view On-Device Engine & Models">● Sealed OS: Gemma-2-2B</span>
+          <span class="taskbar-inference-indicator detecting" id="taskbar-inference-indicator" title="Universal Local Inference: Auto-Detecting local connection (Ollama, LM Studio, llama.cpp, LocalAI)... Click to configure">⚡ Inference: Detecting</span>
           <span class="taskbar-driver-indicator" title="VirtIO Drivers: macOS Tahoe Metal 3 & CoreAudio">🚀 Tahoe VirtIO</span>
+          
+          <!-- macOS Application Firewall Tray Status -->
+          <button id="taskbar-firewall-btn" class="taskbar-firewall-btn" type="button" aria-label="macOS Application Firewall" title="macOS Application Firewall: Active & Protecting - Click to open">
+            <span id="taskbar-firewall-indicator" class="taskbar-firewall-indicator">🛡️</span>
+          </button>
+
+          <!-- VirtIO-Sound Master Volume Slider & Mute Tray Component -->
+          <div class="taskbar-volume-container" id="taskbar-volume-container">
+            <button id="taskbar-volume-btn" class="taskbar-volume-btn" type="button" aria-label="VirtIO-Sound Master Volume" title="VirtIO-Sound: 80% (macOS CoreAudio 48kHz Stereo) - Click to adjust">
+              <span id="taskbar-volume-icon">🔊</span>
+            </button>
+            <div id="taskbar-volume-popup" class="win95-volume-popup" style="display: none;">
+              <div class="volume-popup-titlebar">
+                <div class="volume-popup-title">
+                  <span>🔊</span> Volume
+                </div>
+                <button id="volume-popup-close" class="volume-popup-close-btn" type="button" title="Close">✕</button>
+              </div>
+              <div class="volume-popup-body">
+                <div class="volume-driver-chip">
+                  <div class="driver-title-row"><span class="driver-status-dot">●</span> <strong>VirtIO-Sound</strong></div>
+                  <div class="driver-detail">macOS CoreAudio 48kHz</div>
+                </div>
+                
+                <div class="volume-slider-wrapper">
+                  <div class="volume-slider-track-labels">
+                    <span>100%</span>
+                    <span>50%</span>
+                    <span>0%</span>
+                  </div>
+                  <div class="volume-slider-track">
+                    <input type="range" id="taskbar-volume-slider" class="win95-vertical-range" min="0" max="100" value="80" orient="vertical" aria-label="Master Volume" />
+                  </div>
+                </div>
+
+                <div class="volume-readout">
+                  <span id="volume-percentage-label">80%</span>
+                </div>
+
+                <div class="volume-mute-row">
+                  <label class="win95-checkbox-container" for="taskbar-volume-mute-checkbox">
+                    <input type="checkbox" id="taskbar-volume-mute-checkbox" />
+                    <span class="mute-text">Mute</span>
+                  </label>
+                </div>
+
+                <div class="volume-actions">
+                  <button id="volume-test-sound-btn" class="win95-btn volume-btn-test" type="button" title="Test VirtIO-Sound 48kHz pipeline">🔊 Test Chime</button>
+                  <button id="volume-popup-open-mixer" class="win95-btn" type="button" style="margin-top: 4px; font-weight: bold; width: 100%; font-size: 0.72rem;" title="Open Advanced Volume Control Mixer">🎛️ Volume Control...</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <span id="taskbar-clock">12:00 PM</span>
         </div>
       </div>

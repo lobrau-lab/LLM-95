@@ -1,0 +1,46 @@
+#!/bin/sh
+# ==============================================================================
+# LLM-95 OS KERNEL INIT SCRIPT (PID 1)
+# Contained Environment for Virtual Machine Boot (QEMU / HVF / KVM / UTM)
+# ==============================================================================
+
+echo "======================================================================"
+echo "  LLM-95 OPERATING SYSTEM KERNEL INITIALIZATION (PID 1)"
+echo "  Sealed VM Appliance | On-Device Neural Compute Core"
+echo "======================================================================"
+
+# 1. Mount Virtual Filesystems
+mount -t proc none /proc
+mount -t sysfs none /sys
+mount -t devtmpfs none /dev 2>/dev/null || mount -t tmpfs none /dev
+mkdir -p /dev/pts /dev/shm
+mount -t devpts none /dev/pts
+mount -t tmpfs none /dev/shm
+
+# 2. Kernel Module & Device Driver Probe (VirtIO Architecture)
+echo "[   0.120] Probing virtual devices (macOS Tahoe VirtIO)..."
+modprobe virtio_pci 2>/dev/null || true
+modprobe virtio_gpu 2>/dev/null || true
+modprobe virtio_snd 2>/dev/null || true
+modprobe virtio_net 2>/dev/null || true
+modprobe virtio_balloon 2>/dev/null || true
+
+# 3. Network Stack Initialization
+echo "[   0.240] Initializing network loopback & DHCP client..."
+ifconfig lo 127.0.0.1 up
+udhcpc -i eth0 -b -s /usr/share/udhcpc/default.script 2>/dev/null || true
+
+# 4. Storage & Model Mount
+echo "[   0.380] Mounting /models storage partition..."
+mkdir -p /models
+if [ -b /dev/vda2 ]; then
+    mount /dev/vda2 /models
+fi
+
+# 5. CoreAudio / VirtIO-Sound ALSA Configuration
+echo "[   0.450] Initializing CoreAudio 48kHz audio pipeline (512 frames buffer)..."
+amixer set Master 80% unmute 2>/dev/null || true
+
+# 6. Launch Supervised System Daemons
+echo "[   0.580] Handing off PID 1 to system supervisor (/usr/bin/supervisord)..."
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/gemini95.conf

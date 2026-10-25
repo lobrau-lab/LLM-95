@@ -5,19 +5,23 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const MODEL_PATH = process.env.MODEL_PATH || '/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+const MODEL_PATH = process.env.MODEL_PATH || '/models/Gemma-2-2B-it-Q4_K_M.gguf';
 const LLAMA_SERVER_URL = process.env.LLAMA_SERVER_URL || 'http://127.0.0.1:8080';
 const CPU_THREADS = parseInt(process.env.THREADS || Math.max(1, os.cpus().length - 1).toString(), 10);
 const CTX_SIZE = parseInt(process.env.CTX_SIZE || '2048', 10);
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
+
+// Serve static assets for v86 and OS images
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Model Registry with Hardware Constraints & Sealed VM Specs
 interface ModelMeta {
@@ -38,6 +42,21 @@ interface ModelMeta {
 
 const AVAILABLE_MODELS: ModelMeta[] = [
   {
+    id: 'gemma-2-2b-it-q4_k_m',
+    name: 'Gemma-2-2B-it-Q4_K_M.gguf',
+    size: '1.62 GB',
+    sizeBytes: 1739000000,
+    parameters: '2.6B',
+    quantization: 'Q4_K_M',
+    ramRequirementMb: 1900,
+    expectedTokensPerSec: '8.8 - 13.5 tok/s',
+    recommendedCores: '2 - 4 Cores',
+    suitability: 'Recommended',
+    description: '★ DEFAULT ON-DEVICE MODEL: Google Gemma 2 flagship architecture. Highly efficient CPU inference, rapid start, superb terminal supervision & low memory footprint (~1.6GB).',
+    url: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
+    active: true
+  },
+  {
     id: 'llama-3.2-3b-instruct-q4_k_m',
     name: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
     size: '2.02 GB',
@@ -47,10 +66,10 @@ const AVAILABLE_MODELS: ModelMeta[] = [
     ramRequirementMb: 2400,
     expectedTokensPerSec: '7.5 - 11.2 tok/s',
     recommendedCores: '4 - 8 Cores',
-    suitability: 'Recommended',
-    description: '★ BEST MATCH FOR 8GB VM: Meta flagship compact model. Superb tool reasoning and OS operation on CPU.',
+    suitability: 'Optimal',
+    description: 'Meta compact model. Tool reasoning and OS operation on CPU.',
     url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-    active: true
+    active: false
   },
   {
     id: 'phi-3.5-mini-instruct-q4_k_m',
@@ -65,21 +84,6 @@ const AVAILABLE_MODELS: ModelMeta[] = [
     suitability: 'Optimal',
     description: 'Microsoft compact reasoning model. Outstanding coding, terminal command generation, and logic.',
     url: 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf',
-    active: false
-  },
-  {
-    id: 'gemma-2-2b-it-q4_k_m',
-    name: 'Gemma-2-2B-it-Q4_K_M.gguf',
-    size: '1.62 GB',
-    sizeBytes: 1739000000,
-    parameters: '2.6B',
-    quantization: 'Q4_K_M',
-    ramRequirementMb: 1900,
-    expectedTokensPerSec: '8.8 - 13.5 tok/s',
-    recommendedCores: '2 - 4 Cores',
-    suitability: 'Optimal',
-    description: 'Google architecture. Extremely light memory footprint (~1.6GB), rapid start, and low CPU heat.',
-    url: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
     active: false
   },
   {
@@ -140,27 +144,300 @@ const PACKAGE_REGISTRY: PackageItem[] = [
   { name: 'lynx', version: '2.9.0', format: 'arch', size: '2.1 MB', installed: false, description: 'Text-mode web browser for terminal internet navigation', category: 'utilities' }
 ];
 
-let activeModelName = path.basename(MODEL_PATH) || 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+// Model Registry File Persistence (model-registry.json)
+const REGISTRY_FILE = path.join(__dirname, 'model-registry.json');
+
+interface ModelRegistryData {
+  version: string;
+  activeModelId: string;
+  activeModelName: string;
+  activeModelPath: string;
+  autoReloadOnBoot: boolean;
+  lastSelectedTimestamp: string;
+  lastBootTimestamp: string;
+  bootCount: number;
+  setupCompleted: boolean;
+  hardwareProfile?: any;
+  installedModels: Array<{
+    id: string;
+    name: string;
+    path: string;
+    size: string;
+    parameters: string;
+    quantization: string;
+    provisionedAt: string;
+  }>;
+  settings?: any;
+}
+
+function loadModelRegistry(): ModelRegistryData {
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      const content = fs.readFileSync(REGISTRY_FILE, 'utf-8');
+      const data = JSON.parse(content) as ModelRegistryData;
+      data.bootCount = (data.bootCount || 0) + 1;
+      data.lastBootTimestamp = new Date().toISOString();
+      fs.writeFileSync(REGISTRY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log(`[Model Registry] Persistent registry loaded: ${data.activeModelName} (Boot #${data.bootCount})`);
+      return data;
+    }
+  } catch (err) {
+    console.warn('[Model Registry] Error reading registry file:', err);
+  }
+
+  const defaultRegistry: ModelRegistryData = {
+    version: '1.0',
+    activeModelId: 'gemma-2-2b-it-q4_k_m',
+    activeModelName: 'Gemma-2-2B-it-Q4_K_M.gguf',
+    activeModelPath: '/models/Gemma-2-2B-it-Q4_K_M.gguf',
+    autoReloadOnBoot: true,
+    lastSelectedTimestamp: new Date().toISOString(),
+    lastBootTimestamp: new Date().toISOString(),
+    bootCount: 1,
+    setupCompleted: false,
+    installedModels: [
+      {
+        id: 'gemma-2-2b-it-q4_k_m',
+        name: 'Gemma-2-2B-it-Q4_K_M.gguf',
+        path: '/models/Gemma-2-2B-it-Q4_K_M.gguf',
+        size: '1.62 GB',
+        parameters: '2.6B',
+        quantization: 'Q4_K_M',
+        provisionedAt: new Date().toISOString()
+      }
+    ],
+    settings: {
+      threadsAllocated: CPU_THREADS,
+      contextSize: CTX_SIZE,
+      hypervisor: 'macOS Tahoe (Virtualization.framework / HVF)'
+    }
+  };
+
+  try {
+    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(defaultRegistry, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[Model Registry] Error writing default registry:', err);
+  }
+  return defaultRegistry;
+}
+
+function saveModelRegistry(update: Partial<ModelRegistryData>): ModelRegistryData {
+  let current: ModelRegistryData;
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      current = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
+    } else {
+      current = loadModelRegistry();
+    }
+  } catch {
+    current = loadModelRegistry();
+  }
+
+  const updated: ModelRegistryData = {
+    ...current,
+    ...update,
+    lastSelectedTimestamp: new Date().toISOString()
+  };
+
+  try {
+    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    console.log(`[Model Registry] Persisted update to model-registry.json (Active: ${updated.activeModelName})`);
+  } catch (e) {
+    console.warn('[Model Registry] Error updating registry file:', e);
+  }
+  return updated;
+}
+
+// Initialize and reload last selected model from persistent registry
+const persistentRegistry = loadModelRegistry();
+let activeModelName = (persistentRegistry.autoReloadOnBoot && persistentRegistry.activeModelName) 
+  ? persistentRegistry.activeModelName 
+  : (path.basename(MODEL_PATH) || 'Gemma-2-2B-it-Q4_K_M.gguf');
+
+AVAILABLE_MODELS.forEach(m => {
+  m.active = (m.id === persistentRegistry.activeModelId || m.name === activeModelName);
+});
+
 const startTime = Date.now();
 let lastInferenceLatency = 38; // ms
 let totalTokensGenerated = 0;
 
-/** Check if local llama-server is healthy */
-async function checkLlamaServer(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch(`${LLAMA_SERVER_URL}/health`, { signal: controller.signal });
-    clearTimeout(timeout);
-    return res.ok;
-  } catch {
-    return false;
-  }
+// Universal Local Inference Engine Auto-Detection & Adapter
+export interface DetectedInferenceServer {
+  type: 'ollama' | 'lmstudio' | 'llama_cpp' | 'vllm' | 'openai_generic' | 'standby';
+  name: string;
+  url: string;
+  models: string[];
+  activeModel?: string;
+  latencyMs: number;
+  healthy: boolean;
+  version?: string;
 }
+
+let customInferenceUrl: string = process.env.LLAMA_SERVER_URL || '';
+let activeInferenceConnection: DetectedInferenceServer = {
+  type: 'standby',
+  name: 'Gemma-95 On-Device Synthetic Core (Standby)',
+  url: '',
+  models: ['Gemma-2-2B-it-Q4_K_M.gguf'],
+  activeModel: activeModelName,
+  latencyMs: 32,
+  healthy: true
+};
+
+const INFERENCE_CANDIDATES = [
+  // User custom endpoint or env var
+  () => customInferenceUrl ? { url: customInferenceUrl.replace(/\/+$/, ''), hint: 'custom' } : null,
+  // Ollama default ports
+  () => ({ url: 'http://127.0.0.1:11434', hint: 'ollama' }),
+  () => ({ url: 'http://localhost:11434', hint: 'ollama' }),
+  () => ({ url: 'http://10.0.2.2:11434', hint: 'ollama' }),
+  () => ({ url: 'http://host.docker.internal:11434', hint: 'ollama' }),
+  // LM Studio default ports
+  () => ({ url: 'http://127.0.0.1:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://localhost:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://10.0.2.2:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://host.docker.internal:1234', hint: 'lmstudio' }),
+  // llama.cpp / llama-server default ports
+  () => ({ url: 'http://127.0.0.1:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://localhost:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://10.0.2.2:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://host.docker.internal:8080', hint: 'llama_cpp' }),
+  // vLLM / FastChat / LocalAI
+  () => ({ url: 'http://127.0.0.1:8000', hint: 'vllm' }),
+  () => ({ url: 'http://localhost:8000', hint: 'vllm' }),
+  () => ({ url: 'http://127.0.0.1:5000', hint: 'openai_generic' })
+];
+
+async function probeEndpoint(baseUrl: string): Promise<DetectedInferenceServer | null> {
+  const cleanUrl = baseUrl.replace(/\/+$/, '');
+  const t0 = Date.now();
+
+  // 1. Try Ollama: GET /api/tags
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/api/tags`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json() as any;
+      const models = Array.isArray(data.models) ? data.models.map((m: any) => m.name || m.model) : [];
+      let version = 'v0.x';
+      try {
+        const vRes = await fetch(`${cleanUrl}/api/version`, { signal: AbortSignal.timeout(300) });
+        if (vRes.ok) {
+          const vData = await vRes.json() as any;
+          version = vData.version || version;
+        }
+      } catch {}
+      return {
+        type: 'ollama',
+        name: `Ollama (${version})`,
+        url: cleanUrl,
+        models: models.length ? models : ['llama3.2', 'llama3', 'mistral', 'phi3'],
+        activeModel: models[0] || 'llama3.2',
+        latencyMs: Date.now() - t0,
+        healthy: true,
+        version
+      };
+    }
+  } catch {}
+
+  // 2. Try LM Studio / OpenAI-compatible: GET /v1/models
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/v1/models`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json() as any;
+      const models = Array.isArray(data.data) ? data.data.map((m: any) => m.id) : [];
+      const isLmStudio = cleanUrl.includes('1234') || (models.some((m: string) => m.includes('/') || m.includes('gguf')));
+      return {
+        type: isLmStudio ? 'lmstudio' : 'openai_generic',
+        name: isLmStudio ? 'LM Studio' : 'OpenAI-Compatible Server',
+        url: cleanUrl,
+        models: models.length ? models : ['local-model'],
+        activeModel: models[0] || 'local-model',
+        latencyMs: Date.now() - t0,
+        healthy: true
+      };
+    }
+  } catch {}
+
+  // 3. Try llama.cpp / llama-server: GET /health
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      return {
+        type: 'llama_cpp',
+        name: 'llama.cpp Native Server',
+        url: cleanUrl,
+        models: [activeModelName],
+        activeModel: activeModelName,
+        latencyMs: Date.now() - t0,
+        healthy: true
+      };
+    }
+  } catch {}
+
+  return null;
+}
+
+async function universalAutoDetectInference(forceProbeUrl?: string): Promise<DetectedInferenceServer> {
+  if (forceProbeUrl) {
+    const detected = await probeEndpoint(forceProbeUrl);
+    if (detected) {
+      activeInferenceConnection = detected;
+      return detected;
+    }
+  }
+
+  const candidates: Array<{ url: string; hint: string }> = [];
+  const seen = new Set<string>();
+  for (const fn of INFERENCE_CANDIDATES) {
+    const item = fn();
+    if (item && !seen.has(item.url)) {
+      seen.add(item.url);
+      candidates.push(item);
+    }
+  }
+
+  const probes = candidates.map(c => probeEndpoint(c.url));
+  const results = await Promise.allSettled(probes);
+
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value && r.value.healthy) {
+      activeInferenceConnection = r.value;
+      console.log(`[Universal Inference] Auto-detected local inference server: ${r.value.name} at ${r.value.url}`);
+      return r.value;
+    }
+  }
+
+  activeInferenceConnection = {
+    type: 'standby',
+    name: 'LLM-95 On-Device Synthetic Core (Standby)',
+    url: '',
+    models: AVAILABLE_MODELS.map(m => m.name),
+    activeModel: activeModelName,
+    latencyMs: 30,
+    healthy: true
+  };
+  return activeInferenceConnection;
+}
+
+// Initial probe
+universalAutoDetectInference().catch(() => {});
 
 /** Health check endpoint reporting inference latency, hardware, and model status */
 app.get('/health', async (_req: Request, res: Response) => {
-  const isLlamaRunning = await checkLlamaServer();
+  if (activeInferenceConnection.type === 'standby') {
+    await universalAutoDetectInference().catch(() => {});
+  }
+  const isConnected = activeInferenceConnection.type !== 'standby' && activeInferenceConnection.healthy;
   const modelExists = fs.existsSync(MODEL_PATH);
   const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
   const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
@@ -168,8 +445,9 @@ app.get('/health', async (_req: Request, res: Response) => {
   const usedMemMb = totalMemMb - freeMemMb;
 
   res.json({
-    status: isLlamaRunning ? 'online' : (modelExists ? 'ready_to_load' : 'standby_emulation'),
-    engine: isLlamaRunning ? 'llama.cpp server (native)' : 'llama-95 on-device runtime',
+    status: isConnected ? 'online' : (modelExists ? 'ready_to_load' : 'standby_emulation'),
+    engine: isConnected ? `${activeInferenceConnection.name} (${activeInferenceConnection.url})` : 'llama-95 on-device runtime',
+    connection: activeInferenceConnection,
     model: activeModelName,
     modelPath: MODEL_PATH,
     modelFoundOnDisk: modelExists,
@@ -258,10 +536,114 @@ app.post('/api/models/select', (req: Request, res: Response) => {
   if (target) {
     activeModelName = target.name;
     AVAILABLE_MODELS.forEach(m => { m.active = m.id === target.id; });
-    res.json({ success: true, activeModel: target.name });
+    const reg = saveModelRegistry({
+      activeModelId: target.id,
+      activeModelName: target.name,
+      activeModelPath: `/models/${target.name}`
+    });
+    res.json({ success: true, activeModel: target.name, registry: reg });
   } else {
     res.status(404).json({ error: 'Model not found in registry' });
   }
+});
+
+/** Model Registry API: Get persistent registry status and configuration */
+app.get('/api/model-registry', (_req: Request, res: Response) => {
+  let registry: ModelRegistryData;
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
+    } else {
+      registry = loadModelRegistry();
+    }
+  } catch {
+    registry = loadModelRegistry();
+  }
+
+  res.json({
+    success: true,
+    registryFile: REGISTRY_FILE,
+    activeModel: activeModelName,
+    registry,
+    models: AVAILABLE_MODELS
+  });
+});
+
+/** Model Registry API: Update persistent settings and active model */
+app.post('/api/model-registry', (req: Request, res: Response) => {
+  const { modelId, autoReloadOnBoot, settings, hardwareProfile } = req.body;
+  const target = modelId ? AVAILABLE_MODELS.find(m => m.id === modelId || m.name === modelId) : null;
+  
+  const updatePayload: Partial<ModelRegistryData> = {};
+  if (target) {
+    activeModelName = target.name;
+    AVAILABLE_MODELS.forEach(m => { m.active = m.id === target.id; });
+    updatePayload.activeModelId = target.id;
+    updatePayload.activeModelName = target.name;
+    updatePayload.activeModelPath = `/models/${target.name}`;
+  }
+  if (typeof autoReloadOnBoot === 'boolean') {
+    updatePayload.autoReloadOnBoot = autoReloadOnBoot;
+  }
+  if (settings) updatePayload.settings = settings;
+  if (hardwareProfile) updatePayload.hardwareProfile = hardwareProfile;
+
+  const saved = saveModelRegistry(updatePayload);
+  res.json({ success: true, message: 'Model Registry settings persisted to model-registry.json', registry: saved });
+});
+
+/** Model Registry API: Force reload last selected model from registry */
+app.post('/api/model-registry/reload', (_req: Request, res: Response) => {
+  const reg = loadModelRegistry();
+  if (reg.activeModelName) {
+    activeModelName = reg.activeModelName;
+    AVAILABLE_MODELS.forEach(m => {
+      m.active = (m.id === reg.activeModelId || m.name === reg.activeModelName);
+    });
+  }
+  res.json({
+    success: true,
+    reloadedModel: activeModelName,
+    activeModelId: reg.activeModelId,
+    bootCount: reg.bootCount,
+    message: `Reloaded ${activeModelName} from model-registry.json on boot.`
+  });
+});
+
+// VirtIO-Sound Audio Subsystem State
+let masterVolume = 80;
+let isMuted = false;
+
+/** VirtIO-Sound Master Volume & Audio Driver Status */
+app.get('/api/system/sound', (_req: Request, res: Response) => {
+  res.json({
+    driver: 'VirtIO-Sound (virtio_snd ALSA Module)',
+    hostPipeline: 'macOS Tahoe CoreAudio Low-Latency Direct Passthrough',
+    sampleRate: 48000,
+    bitDepth: 24,
+    channels: 'Stereo (2.0)',
+    bufferSize: 512,
+    latencyMs: 10.6,
+    masterVolume,
+    isMuted,
+    retroEmulation: 'Sound Blaster 16 (IRQ 5, Port 220)'
+  });
+});
+
+app.post('/api/system/sound', (req: Request, res: Response) => {
+  const { volume, muted } = req.body;
+  if (typeof volume === 'number') {
+    masterVolume = Math.max(0, Math.min(100, Math.round(volume)));
+  }
+  if (typeof muted === 'boolean') {
+    isMuted = muted;
+  }
+  res.json({
+    success: true,
+    masterVolume,
+    isMuted,
+    status: isMuted ? 'MUTED' : `${masterVolume}%`
+  });
 });
 
 /** Deep Hardware Scanner & Model Recommendation Engine */
@@ -280,16 +662,13 @@ app.get('/api/hardware/scan', (_req: Request, res: Response) => {
   const memBonus = Math.min(3000, Math.floor(totalMemMb / 4));
   const hardwareScore = scoreBase + archBonus + memBonus;
 
-  // Determine optimal model recommendation
-  let recommendedModelId = 'llama-3.2-3b-instruct-q4_k_m';
-  let recommendationReason = 'Optimal match: Meta Llama-3.2-3B gives the highest reasoning-to-RAM efficiency for the 8GB sealed VM limit, executing 7-11 tokens/sec on CPU.';
+  // Determine optimal model recommendation (Default: Gemma)
+  let recommendedModelId = 'gemma-2-2b-it-q4_k_m';
+  let recommendationReason = '★ DEFAULT ON-DEVICE MODEL: Google Gemma-2-2B gives the highest reasoning performance and lowest latency for the sealed VM appliance, executing 9-14 tokens/sec on CPU.';
 
   if (totalMemMb < 3800 || cpuCount <= 2) {
     recommendedModelId = 'smollm2-1.7b-instruct-q4_k_m';
     recommendationReason = 'Detected compact host memory envelope. SmolLM2 1.7B provides instant latency (>14 tok/s) and fits comfortably inside 1.3GB RAM.';
-  } else if (totalMemMb >= 16000 && cpuCount >= 8) {
-    recommendedModelId = 'llama-3.2-3b-instruct-q4_k_m';
-    recommendationReason = 'High-performance workstation detected. Llama-3.2-3B offers rapid autonomous OS piloting while preserving 5.6GB RAM for multitasking.';
   }
 
   const modelsWithSuitability = AVAILABLE_MODELS.map(m => ({
@@ -334,7 +713,7 @@ app.get('/api/hardware/scan', (_req: Request, res: Response) => {
 
 /** Direct Sealed VM Model Provisioning Endpoint */
 app.post('/api/vm/provision', async (req: Request, res: Response) => {
-  const { modelId, modelName } = req.body;
+  const { modelId, modelName, hardwareProfile } = req.body;
   const target = AVAILABLE_MODELS.find(m => m.id === modelId || m.name === modelName);
 
   if (!target) {
@@ -356,7 +735,28 @@ app.post('/api/vm/provision', async (req: Request, res: Response) => {
     // Ignore in read-only container
   }
 
-  console.log(`[LLM-95 PROVISION] Model ${target.name} downloaded & locked as Sealed VM OS Kernel.`);
+  // Persist model choice to model-registry.json
+  const reg = saveModelRegistry({
+    activeModelId: target.id,
+    activeModelName: target.name,
+    activeModelPath: `/models/${target.name}`,
+    setupCompleted: true,
+    autoReloadOnBoot: true,
+    hardwareProfile: hardwareProfile || undefined,
+    installedModels: [
+      {
+        id: target.id,
+        name: target.name,
+        path: `/models/${target.name}`,
+        size: target.size,
+        parameters: target.parameters,
+        quantization: target.quantization,
+        provisionedAt: new Date().toISOString()
+      }
+    ]
+  });
+
+  console.log(`[LLM-95 PROVISION] Model ${target.name} downloaded & saved to persistent model registry.`);
 
   res.json({
     success: true,
@@ -365,8 +765,36 @@ app.post('/api/vm/provision', async (req: Request, res: Response) => {
     path: `/models/${target.name}`,
     kernelSymlink: '/models/kernel-brain.gguf',
     kernelStatus: 'SEALED_OS_ACTIVE',
-    message: `Model ${target.name} downloaded directly into VM area and flashed as the operating system kernel.`
+    registry: reg,
+    message: `Model ${target.name} downloaded directly into VM area, registered in model-registry.json, and flashed as operating system kernel.`
   });
+});
+
+/** Bootloader & Contained VM Environment Files Endpoint */
+app.get('/api/vm/boot-files', (_req: Request, res: Response) => {
+  try {
+    const grubPath = path.join(__dirname, 'boot', 'grub', 'grub.cfg');
+    const initPath = path.join(__dirname, 'init');
+    const launchPath = path.join(__dirname, 'scripts', 'create-vm-bundle.sh');
+    const qemuLaunchPath = path.join(__dirname, 'run-macos-tahoe.sh');
+
+    const grubCfg = fs.existsSync(grubPath) ? fs.readFileSync(grubPath, 'utf8') : '';
+    const initScript = fs.existsSync(initPath) ? fs.readFileSync(initPath, 'utf8') : '';
+    const bundleScript = fs.existsSync(launchPath) ? fs.readFileSync(launchPath, 'utf8') : '';
+    const qemuScript = fs.existsSync(qemuLaunchPath) ? fs.readFileSync(qemuLaunchPath, 'utf8') : '';
+
+    res.json({
+      success: true,
+      files: {
+        'grub.cfg': grubCfg,
+        'init': initScript,
+        'create-vm-bundle.sh': bundleScript,
+        'run-macos-tahoe.sh': qemuScript
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /** Package Manager endpoints */
@@ -413,6 +841,376 @@ app.post('/api/packages/remove', (req: Request, res: Response) => {
   } else {
     res.status(404).json({ error: 'Package not found' });
   }
+});
+
+// ==========================================
+// macOS Application Firewall & Packet Filter
+// ==========================================
+interface ServerFirewallRule {
+  id: string;
+  name: string;
+  path: string;
+  action: 'allow' | 'block';
+  icon: string;
+  system: boolean;
+}
+
+const serverFirewallState = {
+  enabled: true,
+  blockAllIncoming: false,
+  stealthMode: true,
+  allowSignedSoftware: true,
+  locked: false,
+  blockedDomains: [
+    'malware-test.org',
+    'phishing-simulator.net',
+    'cryptominer-pool.xyz',
+    'trackers.adservice.net',
+    'telemetry.suspicious-analytics.io'
+  ],
+  rules: [
+    { id: 'chrome', name: 'Web Browser (chrome.exe)', path: '/usr/bin/chrome', action: 'allow', icon: '🌐', system: true },
+    { id: 'v86_wasm', name: 'x86 Virtual Machine (v86-core.wasm)', path: '/system/v86.wasm', action: 'allow', icon: '🖥️', system: true },
+    { id: 'virtio_net', name: 'VirtIO-Net Ethernet Device', path: '/kernel/drivers/virtio_net', action: 'allow', icon: '🔌', system: true },
+    { id: 'gemma_pilot', name: 'Gemma-2-2B Local OS Pilot', path: '/models/gemma-kernel', action: 'allow', icon: '🤖', system: true },
+    { id: 'proxy_gateway', name: 'HTTP/HTTPS Proxy Gateway', path: '/system/proxy-daemon', action: 'allow', icon: '⚡', system: true }
+  ] as ServerFirewallRule[],
+  stats: {
+    inspected: 12,
+    passed: 12,
+    blocked: 0,
+    inbound: 4,
+    outbound: 8,
+    stealthDrops: 0
+  },
+  logs: [] as any[]
+};
+
+function checkServerFirewall(appId: string, hostname: string, urlStr: string, direction: 'INBOUND' | 'OUTBOUND') {
+  serverFirewallState.stats.inspected++;
+  if (direction === 'INBOUND') serverFirewallState.stats.inbound++;
+  else serverFirewallState.stats.outbound++;
+
+  if (!serverFirewallState.enabled) {
+    return { blocked: false, reason: 'Firewall is turned OFF' };
+  }
+
+  if (direction === 'INBOUND' && serverFirewallState.blockAllIncoming) {
+    serverFirewallState.stats.blocked++;
+    return { blocked: true, reason: 'macOS Application Firewall: Block all incoming connections is ACTIVE' };
+  }
+
+  const appRule = serverFirewallState.rules.find(r => r.id === appId || r.name.toLowerCase().includes(appId.toLowerCase()));
+  if (appRule && appRule.action === 'block') {
+    serverFirewallState.stats.blocked++;
+    return { blocked: true, reason: `Application policy: '${appRule.name}' is set to BLOCK connections` };
+  }
+
+  const testTarget = (hostname + ' ' + urlStr).toLowerCase();
+  const matchedBlocked = serverFirewallState.blockedDomains.find(d => testTarget.includes(d.toLowerCase()));
+  if (matchedBlocked) {
+    serverFirewallState.stats.blocked++;
+    return { blocked: true, reason: `Packet filter: Destination matches blocked domain [${matchedBlocked}]` };
+  }
+
+  serverFirewallState.stats.passed++;
+  return { blocked: false, reason: 'Passed stateful packet filter rule' };
+}
+
+app.get('/api/firewall', (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    config: {
+      enabled: serverFirewallState.enabled,
+      blockAllIncoming: serverFirewallState.blockAllIncoming,
+      stealthMode: serverFirewallState.stealthMode,
+      allowSignedSoftware: serverFirewallState.allowSignedSoftware,
+      locked: serverFirewallState.locked,
+      blockedDomains: serverFirewallState.blockedDomains,
+      rules: serverFirewallState.rules
+    },
+    stats: serverFirewallState.stats,
+    recentLogs: serverFirewallState.logs.slice(0, 50)
+  });
+});
+
+app.post('/api/firewall/toggle', (req: Request, res: Response) => {
+  const { setting, value } = req.body;
+  if (setting === 'enabled') serverFirewallState.enabled = !!value;
+  else if (setting === 'blockAllIncoming') serverFirewallState.blockAllIncoming = !!value;
+  else if (setting === 'stealthMode') serverFirewallState.stealthMode = !!value;
+  else if (setting === 'locked') serverFirewallState.locked = !!value;
+  res.json({ success: true, state: serverFirewallState });
+});
+
+app.post('/api/firewall/rule', (req: Request, res: Response) => {
+  const { appId, action, addDomain, removeDomain } = req.body;
+  if (appId && (action === 'allow' || action === 'block')) {
+    const r = serverFirewallState.rules.find(x => x.id === appId);
+    if (r) r.action = action;
+  }
+  if (addDomain && typeof addDomain === 'string') {
+    const clean = addDomain.trim().toLowerCase();
+    if (!serverFirewallState.blockedDomains.includes(clean)) {
+      serverFirewallState.blockedDomains.push(clean);
+    }
+  }
+  if (removeDomain && typeof removeDomain === 'string') {
+    serverFirewallState.blockedDomains = serverFirewallState.blockedDomains.filter(d => d !== removeDomain.toLowerCase());
+  }
+  res.json({ success: true, state: serverFirewallState });
+});
+
+app.post('/api/firewall/clear', (_req: Request, res: Response) => {
+  serverFirewallState.logs = [];
+  res.json({ success: true });
+});
+
+// ==========================================
+// Live Internet Web Proxy Gateway
+// ==========================================
+app.get('/api/proxy', async (req: Request, res: Response) => {
+  const targetUrl = req.query.url as string;
+  if (!targetUrl) {
+    return res.status(400).send('Target URL required via ?url= parameter');
+  }
+
+  let resolvedUrl = targetUrl.trim();
+  if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) {
+    resolvedUrl = 'https://' + resolvedUrl;
+  }
+
+  try {
+    const urlObj = new URL(resolvedUrl);
+
+    // Run request through the macOS-style Application Firewall
+    const firewallCheck = checkServerFirewall('chrome', urlObj.hostname, resolvedUrl, 'OUTBOUND');
+
+    const logEntry = {
+      id: `srv-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toLocaleTimeString(),
+      protocol: resolvedUrl.startsWith('https') ? 'HTTPS' : 'HTTP',
+      direction: 'OUTBOUND',
+      app: 'Web Browser (chrome.exe)',
+      source: '127.0.0.1:3000',
+      destination: urlObj.hostname,
+      port: resolvedUrl.startsWith('https') ? 443 : 80,
+      decision: firewallCheck.blocked ? 'DROP' : 'PASS',
+      reason: firewallCheck.reason,
+      payloadBytes: 512
+    };
+    serverFirewallState.logs.unshift(logEntry);
+    if (serverFirewallState.logs.length > 100) serverFirewallState.logs.pop();
+
+    if (firewallCheck.blocked) {
+      const blockHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>LLM-95 Application Firewall - Connection Blocked</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1c23; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .card { background: #222634; border: 2px solid #ff4757; border-radius: 8px; padding: 26px; max-width: 520px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .icon { font-size: 2.4rem; }
+    h2 { margin: 0; color: #ff6b6b; font-size: 1.25rem; }
+    .detail { background: #13151f; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; margin: 14px 0; word-break: break-all; border-left: 4px solid #ff4757; }
+    .meta { font-size: 0.85rem; color: #a4b0be; line-height: 1.5; }
+    .tip { margin-top: 16px; font-size: 0.8rem; color: #70a1ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="icon">🛡️</div>
+      <div>
+        <h2>Connection Blocked by Firewall</h2>
+        <div style="font-size: 0.8rem; color: #888;">macOS Application Firewall &amp; Packet Filter</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div><strong>Target:</strong> ${resolvedUrl}</div>
+      <div><strong>Host:</strong> ${urlObj.hostname}</div>
+      <div><strong>Reason:</strong> ${firewallCheck.reason}</div>
+      <div><strong>Process:</strong> Web Browser (chrome.exe / PID 204)</div>
+    </div>
+    <div class="meta">
+      The built-in application firewall intercepted and rejected this network request in accordance with active security policies.
+    </div>
+    <div class="tip">
+      💡 To allow this connection, open <strong>Start &gt; 🛡️ Firewall</strong> or click the <strong>🛡️ Firewall</strong> desktop icon, and adjust Application Rules or Domain Filter list.
+    </div>
+  </div>
+</body>
+</html>`;
+      return res.status(403).setHeader('Content-Type', 'text/html').send(blockHtml);
+    }
+
+    const abortCtrl = new AbortController();
+    const timeout = setTimeout(() => abortCtrl.abort(), 12000);
+
+    const response = await fetch(resolvedUrl, {
+      signal: abortCtrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 LLM-95/1.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      }
+    });
+    clearTimeout(timeout);
+
+    const contentType = response.headers.get('content-type') || 'text/html';
+    res.setHeader('Content-Type', contentType);
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('Content-Security-Policy-Report-Only');
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+
+    if (contentType.includes('text/html')) {
+      let html = await response.text();
+
+      const baseTag = `<base href="${resolvedUrl}">\n<script>
+window.__PROXY_BASE__ = ${JSON.stringify(resolvedUrl)};
+document.addEventListener('click', function(e) {
+  var a = e.target.closest('a');
+  if (a && a.href && !a.href.startsWith('javascript:') && !a.href.startsWith('#')) {
+    e.preventDefault();
+    window.parent.postMessage({ type: 'BROWSER_NAVIGATE', url: a.href }, '*');
+  }
+}, true);
+document.addEventListener('submit', function(e) {
+  var form = e.target;
+  if (form && form.action) {
+    if ((form.method || 'GET').toUpperCase() === 'GET') {
+      e.preventDefault();
+      var formData = new FormData(form);
+      var searchParams = new URLSearchParams(formData);
+      var target = form.action + (form.action.includes('?') ? '&' : '?') + searchParams.toString();
+      window.parent.postMessage({ type: 'BROWSER_NAVIGATE', url: target }, '*');
+    }
+  }
+}, true);
+window.addEventListener('load', function() {
+  window.parent.postMessage({
+    type: 'BROWSER_PAGE_LOADED',
+    url: ${JSON.stringify(resolvedUrl)},
+    title: document.title || ${JSON.stringify(urlObj.hostname)}
+  }, '*');
+});
+</script>`;
+
+      if (html.includes('<head>')) {
+        html = html.replace('<head>', `<head>\n${baseTag}`);
+      } else if (html.includes('<html>')) {
+        html = html.replace('<html>', `<html>\n<head>${baseTag}</head>`);
+      } else {
+        html = `<head>${baseTag}</head>\n${html}`;
+      }
+
+      return res.send(html);
+    } else {
+      const buffer = await response.arrayBuffer();
+      return res.send(Buffer.from(buffer));
+    }
+  } catch (err: any) {
+    const errorHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Error Connecting to ${resolvedUrl}</title>
+  <style>
+    body { font-family: sans-serif; background: #c0c0c0; color: #000; padding: 20px; }
+    .box { border: 2px outset #fff; background: #fff; padding: 16px; max-width: 500px; margin: 40px auto; }
+    h3 { margin-top: 0; color: #800000; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h3>🌐 Unable to Connect to Web Server</h3>
+    <p>Could not retrieve page from <code>${resolvedUrl}</code></p>
+    <p style="font-size: 0.85rem; color: #555;"><strong>Details:</strong> ${err.message || 'Connection timed out or host unreachable'}</p>
+    <button onclick="window.history.back()">Go Back</button>
+  </div>
+</body>
+</html>`;
+    return res.status(502).setHeader('Content-Type', 'text/html').send(errorHtml);
+  }
+});
+
+/** Gemma Visual Copilot & Supervisor Endpoint */
+app.post('/api/agent/analyze', async (req: Request, res: Response) => {
+  const { prompt, screenshotDataUrl, serialLog } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  // If GEMINI_API_KEY is available, use GoogleGenAI multimodal perception
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const parts: any[] = [];
+
+      const systemInstruction = `You are Gemma 95 OS Visual Supervisor & Hardware Agent.
+You are monitoring a REAL in-browser x86 Virtual Machine (running FreeDOS, Linux, or KolibriOS on an emulated 80486/Pentium CPU with VGA display).
+Your role is to diagnose the VM's current screen framebuffer, inspect serial UART COM1 output, and provide exact, deterministic shell commands or actions.
+Return a structured, crisp response with your diagnosis and exact commands to execute.`;
+
+      parts.push({
+        text: `${systemInstruction}\n\nUser instruction: ${prompt}\n\nUART COM1 Serial stream:\n${serialLog || '(no serial output yet)'}`
+      });
+
+      if (screenshotDataUrl && typeof screenshotDataUrl === 'string' && screenshotDataUrl.startsWith('data:image/')) {
+        const matches = screenshotDataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1] === 'png' ? 'image/png' : 'image/jpeg';
+          const base64Data = matches[2];
+          parts.push({
+            inlineData: {
+              mimeType,
+              data: base64Data
+            }
+          });
+        }
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts
+          }
+        ]
+      });
+
+      const text = response.text || '';
+      const commandMatches: string[] = [];
+      const codeBlockMatch = text.match(/```(?:dos|batch|bash|sh)?\n([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        codeBlockMatch[1]
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#') && !l.startsWith('rem') && !l.startsWith('::'))
+          .forEach(c => commandMatches.push(c));
+      }
+
+      return res.json({
+        diagnosis: text,
+        commandsToRun: commandMatches,
+        executionType: commandMatches.length > 0 ? 'keyboard-inject' : 'informational'
+      });
+    } catch (err: any) {
+      console.warn('[Server] Gemini agent analysis error:', err?.message || err);
+    }
+  }
+
+  // Deterministic local response
+  return res.json({
+    diagnosis: `[Gemma Supervisor] Monitored instruction: "${prompt}". Framebuffer & UART COM1 checked.`,
+    commandsToRun: [prompt.trim()],
+    executionType: 'keyboard-inject'
+  });
 });
 
 /** Interactive Terminal Execution Endpoint */
@@ -493,7 +1291,41 @@ Available commands:
     case 'sound-test':
       output = `[VirtIO Sound] Emitting 48000Hz 24-bit stereo test tone...
 CoreAudio pipeline: OK (Buffer: 512f, Latency: 10.6ms)
+Master Volume: ${masterVolume}% [${isMuted ? 'MUTED' : 'ACTIVE'}]
 Sound Blaster 16 DSP: Handshake acknowledged. Retro sound active.`;
+      break;
+
+    case 'volume':
+      if (args.length > 0) {
+        const val = parseInt(args[0], 10);
+        if (!isNaN(val) && val >= 0 && val <= 100) {
+          masterVolume = val;
+          output = `VirtIO-Sound Master Volume set to: ${masterVolume}%`;
+        } else {
+          output = `Usage: volume <0-100>`;
+          exitCode = 1;
+        }
+      } else {
+        output = `VirtIO-Sound Master Volume: ${masterVolume}% [${isMuted ? 'MUTED' : 'ACTIVE'}]`;
+      }
+      break;
+
+    case 'mute':
+      isMuted = true;
+      output = `VirtIO-Sound driver MUTED. Master Volume is held at ${masterVolume}%.`;
+      break;
+
+    case 'unmute':
+      isMuted = false;
+      output = `VirtIO-Sound driver UNMUTED. Master Volume: ${masterVolume}%.`;
+      break;
+
+    case 'sndvol32':
+    case 'mixer':
+    case 'volume-control':
+      output = `Launching Advanced System Sound Mixer (sndvol32.exe)...
+VirtIO-Sound CoreAudio (48kHz Stereo) Mixer window opened.
+Available Channels: Master Output, Wave/Synth, VirtIO Neural, Line In/CD, Virtual Mic, PC Speaker.`;
       break;
 
     case 'uname':
@@ -580,8 +1412,31 @@ Swap:          2048           0        2048`;
       output = `[Executing on CPU via ${activeModelName}]...\n` + synthesizeLocalResponse(promptStr, 'general');
       break;
 
+    case 'registry':
+      try {
+        const reg = loadModelRegistry();
+        output = `=== LLM-95 MODEL REGISTRY (model-registry.json) ===
+Active Model: ${reg.activeModelName} (${reg.activeModelId})
+Path: ${reg.activeModelPath}
+Auto-Reload on Boot: ${reg.autoReloadOnBoot ? 'ENABLED' : 'DISABLED'}
+Boot Count: ${reg.bootCount}
+Last Updated: ${reg.lastSelectedTimestamp}
+Installed Models: ${reg.installedModels.length}
+--------------------------------------------------
+${JSON.stringify(reg, null, 2)}`;
+      } catch (err) {
+        output = `Error loading model registry: ${err}`;
+      }
+      break;
+
     case 'cat':
-      if (args[0] === '/etc/os-release') {
+      if (args[0] === 'model-registry.json' || args[0] === '/etc/model-registry.json') {
+        try {
+          output = fs.readFileSync(REGISTRY_FILE, 'utf-8');
+        } catch {
+          output = JSON.stringify(loadModelRegistry(), null, 2);
+        }
+      } else if (args[0] === '/etc/os-release') {
         output = `NAME="LLM-95 OS"
 VERSION="1.0-tahoe"
 ID=llm95
@@ -595,12 +1450,13 @@ SUPPORT_URL="https://huggingface.co/models"`;
 
     case 'ls':
     case 'dir':
-      output = `total 24
+      output = `total 28
 drwxr-xr-x 2 root root 4096 Oct 16 00:30 bin
 drwxr-xr-x 2 root root 4096 Oct 16 00:30 dev
 drwxr-xr-x 3 root root 4096 Oct 16 00:30 etc
 drwxr-xr-x 2 root root 4096 Oct 16 00:30 models
 drwxr-xr-x 4 root root 4096 Oct 16 00:30 app
+-rw-r--r-- 1 root root 1024 Oct 16 00:30 model-registry.json
 -rwxr-xr-x 1 root root 8192 Oct 16 00:30 build.sh`;
       break;
 
@@ -696,19 +1552,180 @@ Responding to your prompt: "${prompt.slice(0, 100)}${prompt.length > 100 ? '...'
 In this self-contained VM architecture, inference executes entirely on-device via quantized GGUF tensor operations without transmitting data over the network. The system latency is running at ${lastInferenceLatency}ms with memory consumption locked under 2.1GB.`;
 }
 
-/** Unified Generate endpoint */
+/** Universal Local Inference Detection Endpoint */
+app.get('/api/inference/detect', async (req: Request, res: Response) => {
+  const probeUrl = req.query.url as string | undefined;
+  const detected = await universalAutoDetectInference(probeUrl);
+  res.json({
+    success: true,
+    detected,
+    message: detected.type !== 'standby'
+      ? `Successfully detected and connected to local inference: ${detected.name} at ${detected.url}`
+      : 'No active external local engine responded; using sealed on-device retro synthetic runtime.'
+  });
+});
+
+/** Inference Connection Status Endpoint */
+app.get('/api/inference/status', (_req: Request, res: Response) => {
+  res.json({
+    connection: activeInferenceConnection,
+    customUrl: customInferenceUrl,
+    activeModel: activeModelName
+  });
+});
+
+/** Inference Connection Configuration Endpoint */
+app.post('/api/inference/config', async (req: Request, res: Response) => {
+  const { url, activeModel, forceType } = req.body;
+  if (typeof url === 'string') {
+    customInferenceUrl = url.trim();
+  }
+  const detected = await universalAutoDetectInference(customInferenceUrl || undefined);
+  if (activeModel && typeof activeModel === 'string') {
+    detected.activeModel = activeModel;
+    activeInferenceConnection.activeModel = activeModel;
+  }
+  if (forceType && typeof forceType === 'string') {
+    detected.type = forceType as any;
+  }
+  res.json({
+    success: true,
+    connection: detected,
+    message: `Inference connection configured: ${detected.name}`
+  });
+});
+
+/** Universal Local Inference Proxy (prevents browser CORS & Mixed-Content blocks) */
+app.post('/api/inference/proxy', async (req: Request, res: Response) => {
+  const { targetUrl, path = '/api/generate', method = 'POST', body = {} } = req.body;
+  const destination = (targetUrl || activeInferenceConnection.url || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+  try {
+    const proxyRes = await fetch(`${destination}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await proxyRes.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: `Proxy failed to connect to ${destination}: ${err.message}` });
+  }
+});
+
+/** Unified Generate endpoint - Universally compatible with Ollama, LM Studio, llama.cpp & on-device fallback */
 app.post('/api/generate', async (req: Request, res: Response) => {
   const startTimeMs = Date.now();
-  const { prompt, stream = false, contextType = 'general', temperature = 0.7, max_tokens = 512 } = req.body;
+  const { prompt, stream = false, contextType = 'general', temperature = 0.7, max_tokens = 512, model } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ error: 'Missing prompt' });
   }
 
-  const isLlamaRunning = await checkLlamaServer();
-  if (isLlamaRunning) {
+  // 1. If Ollama is connected
+  if (activeInferenceConnection.healthy && activeInferenceConnection.type === 'ollama' && activeInferenceConnection.url) {
     try {
-      const llamaRes = await fetch(`${LLAMA_SERVER_URL}/completion`, {
+      const targetModel = model || activeInferenceConnection.activeModel || (activeInferenceConnection.models[0] || 'llama3.2');
+      const ollamaRes = await fetch(`${activeInferenceConnection.url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          prompt,
+          stream,
+          options: { temperature }
+        })
+      });
+
+      if (ollamaRes.ok) {
+        if (stream && ollamaRes.body) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          const reader = ollamaRes.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buf = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const parsed = JSON.parse(line);
+                res.write(`data: ${JSON.stringify({ content: parsed.response || '' })}\n\n`);
+                if (parsed.done) {
+                  res.write('data: [DONE]\n\n');
+                }
+              } catch {}
+            }
+          }
+          res.end();
+          return;
+        } else {
+          const data: any = await ollamaRes.json();
+          lastInferenceLatency = Date.now() - startTimeMs;
+          return res.json({
+            text: data.response || '',
+            latencyMs: lastInferenceLatency,
+            tokensPredicted: data.eval_count || 30,
+            model: targetModel,
+            engine: activeInferenceConnection.name
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Universal Inference] Ollama call failed, trying fallbacks:', e);
+    }
+  }
+
+  // 2. If LM Studio or OpenAI-compatible server is connected
+  if (activeInferenceConnection.healthy && (activeInferenceConnection.type === 'lmstudio' || activeInferenceConnection.type === 'openai_generic' || activeInferenceConnection.type === 'vllm') && activeInferenceConnection.url) {
+    try {
+      const targetModel = model || activeInferenceConnection.activeModel || (activeInferenceConnection.models[0] || 'local-model');
+      const openaiRes = await fetch(`${activeInferenceConnection.url}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [{ role: 'user', content: prompt }],
+          stream,
+          temperature,
+          max_tokens
+        })
+      });
+
+      if (openaiRes.ok) {
+        if (stream && openaiRes.body) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          // @ts-ignore
+          openaiRes.body.pipe(res);
+          return;
+        } else {
+          const data: any = await openaiRes.json();
+          lastInferenceLatency = Date.now() - startTimeMs;
+          const content = data.choices?.[0]?.message?.content || '';
+          return res.json({
+            text: content,
+            latencyMs: lastInferenceLatency,
+            tokensPredicted: data.usage?.completion_tokens || 30,
+            model: targetModel,
+            engine: activeInferenceConnection.name
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Universal Inference] LM Studio / OpenAI endpoint call failed, trying fallbacks:', e);
+    }
+  }
+
+  // 3. If native llama.cpp server is connected
+  if (activeInferenceConnection.healthy && activeInferenceConnection.type === 'llama_cpp' && activeInferenceConnection.url) {
+    try {
+      const llamaRes = await fetch(`${activeInferenceConnection.url}/completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -735,15 +1752,17 @@ app.post('/api/generate', async (req: Request, res: Response) => {
             text: data.content || '',
             latencyMs: lastInferenceLatency,
             tokensPredicted: data.tokens_predicted,
-            model: activeModelName
+            model: activeModelName,
+            engine: activeInferenceConnection.name
           });
         }
       }
     } catch (e) {
-      console.warn('llama-server request failed, falling back to local synthesizer:', e);
+      console.warn('[Universal Inference] llama.cpp request failed, falling back:', e);
     }
   }
 
+  // 4. Standby Synthetic Core (Always Works, Zero-Downtime Guarantee)
   const text = synthesizeLocalResponse(prompt, contextType);
   const words = text.split(' ');
   lastInferenceLatency = Math.min(80, Math.max(15, Math.floor(words.length * 1.8)));
@@ -765,13 +1784,14 @@ app.post('/api/generate', async (req: Request, res: Response) => {
       const chunk = (index === 0 ? '' : ' ') + words[index];
       res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
       index++;
-    }, 45);
+    }, 40);
   } else {
     res.json({
       text,
       latencyMs: lastInferenceLatency,
       tokensPredicted: words.length,
-      model: activeModelName
+      model: activeModelName,
+      engine: 'LLM-95 Retro On-Device Synthetic Core'
     });
   }
 });

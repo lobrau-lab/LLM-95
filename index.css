@@ -1828,4 +1828,2400 @@ body {
     padding-left: 2px;
 }
 
+/* =======================================================
+   VIRTIO-SOUND MASTER VOLUME TRAY COMPONENT & POPUP
+   ======================================================= */
+.taskbar-volume-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.taskbar-volume-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    height: 20px;
+    font-size: 0.85rem;
+    line-height: 1;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.taskbar-volume-btn:hover {
+    border-top: 1px solid #FFFFFF;
+    border-left: 1px solid #FFFFFF;
+    border-right: 1px solid #808080;
+    border-bottom: 1px solid #808080;
+    background-color: #D4D0C8;
+}
+
+.taskbar-volume-btn:active,
+.taskbar-volume-btn.active {
+    border-top: 1px solid #808080;
+    border-left: 1px solid #808080;
+    border-right: 1px solid #FFFFFF;
+    border-bottom: 1px solid #FFFFFF;
+    background-color: #A0A0A0;
+}
+
+/* Classic Win95 Volume Control Dialog */
+.win95-volume-popup {
+    position: fixed;
+    bottom: 38px;
+    right: 48px;
+    width: 135px;
+    background-color: #C0C0C0;
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.volume-popup-titlebar {
+    background-color: #000080;
+    color: #FFFFFF;
+    padding: 2px 4px;
+    font-size: 0.72rem;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 18px;
+    box-sizing: border-box;
+}
+
+.volume-popup-title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.volume-popup-close-btn {
+    width: 13px;
+    height: 13px;
+    background-color: #C0C0C0;
+    border-top: 1px solid #FFFFFF;
+    border-left: 1px solid #FFFFFF;
+    border-right: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+    font-size: 0.62rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #000;
+    padding: 0;
+}
+
+.volume-popup-close-btn:active {
+    border-top: 1px solid #000000;
+    border-left: 1px solid #000000;
+    border-right: 1px solid #FFFFFF;
+    border-bottom: 1px solid #FFFFFF;
+}
+
+.volume-popup-body {
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.volume-driver-chip {
+    background: #E8E8E8;
+    border: 1px inset #808080;
+    font-size: 0.62rem;
+    padding: 2px 4px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 6px;
+    text-align: center;
+    line-height: 1.25;
+}
+
+.volume-driver-chip .driver-status-dot {
+    color: #008800;
+    font-size: 0.7rem;
+}
+
+.volume-driver-chip .driver-title-row {
+    color: #000080;
+}
+
+.volume-driver-chip .driver-detail {
+    color: #555;
+    font-size: 0.58rem;
+}
+
+.volume-slider-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 110px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.volume-slider-track-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 94px;
+    font-size: 0.6rem;
+    color: #444;
+    text-align: right;
+    font-family: monospace;
+}
+
+.volume-slider-track {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 105px;
+    width: 32px;
+}
+
+/* Vertical slider with authentic Win95 bevel thumb and subtle responsive hover state transition */
+.win95-vertical-range {
+    -webkit-appearance: slider-vertical;
+    writing-mode: bt-lr;
+    width: 24px;
+    height: 100px;
+    cursor: pointer;
+    accent-color: #000080;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.win95-vertical-range:hover {
+    filter: brightness(1.15) drop-shadow(0 1px 3px rgba(0, 0, 128, 0.3));
+}
+
+.win95-vertical-range::-webkit-slider-thumb {
+    cursor: grab;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.win95-vertical-range::-webkit-slider-thumb:hover {
+    transform: scale(1.22);
+    filter: brightness(1.28) contrast(1.1);
+}
+
+.win95-vertical-range:active::-webkit-slider-thumb,
+.win95-vertical-range::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.1);
+    filter: brightness(0.92);
+}
+
+.win95-vertical-range::-moz-range-thumb {
+    cursor: grab;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.win95-vertical-range::-moz-range-thumb:hover {
+    transform: scale(1.22);
+    filter: brightness(1.28) contrast(1.1);
+}
+
+.win95-vertical-range:active::-moz-range-thumb,
+.win95-vertical-range::-moz-range-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.1);
+    filter: brightness(0.92);
+}
+
+/* Speaker icon animation on mute vibration */
+@keyframes taskbarVolumeVibrate {
+    0% { transform: scale(1) rotate(0deg); }
+    15% { transform: scale(1.16) rotate(-14deg) translateX(-2px); }
+    30% { transform: scale(1.2) rotate(14deg) translateX(2px); }
+    45% { transform: scale(1.12) rotate(-9deg) translateX(-1px); }
+    60% { transform: scale(1.08) rotate(9deg) translateX(1px); }
+    75% { transform: scale(1.04) rotate(-4deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+#taskbar-volume-icon {
+    display: inline-block;
+    transition: transform 0.15s ease, filter 0.15s ease;
+    transform-origin: center center;
+}
+
+#taskbar-volume-icon.vibrate,
+#taskbar-volume-icon.muted-vibrate,
+#taskbar-volume-container:has(#taskbar-volume-mute-checkbox:checked) #taskbar-volume-icon {
+    animation: taskbarVolumeVibrate 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Universal Local Inference Connection Indicator & UI */
+.taskbar-inference-indicator {
+    color: #000080;
+    font-size: 0.68rem;
+    font-weight: 500;
+    background: #E0E0E0;
+    padding: 1px 5px;
+    border: 1px solid #808080;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+    line-height: 1.2;
+}
+
+.taskbar-inference-indicator:hover {
+    background: #FFFFFF;
+    border-color: #000080;
+}
+
+.taskbar-inference-indicator.connected {
+    color: #006600;
+    font-weight: bold;
+}
+
+.taskbar-inference-indicator.detecting {
+    color: #B8860B;
+}
+
+.taskbar-inference-indicator.standby {
+    color: #4B0082;
+}
+
+.inference-engine-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px inset #808080;
+    background: #F4F4F4;
+    font-size: 0.72rem;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+.volume-readout {
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: #000080;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 4px;
+    background: #FFF;
+    border: 1px inset #808080;
+    padding: 1px 6px;
+    width: 60px;
+    text-align: center;
+}
+
+.volume-mute-row {
+    margin-top: 2px;
+    margin-bottom: 6px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.win95-checkbox-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    cursor: pointer;
+    user-select: none;
+    color: #000;
+}
+
+.win95-checkbox-container input[type="checkbox"] {
+    cursor: pointer;
+    margin: 0;
+}
+
+.volume-actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.volume-btn-test {
+    font-size: 0.68rem !important;
+    padding: 2px 6px !important;
+    width: 100%;
+    cursor: pointer;
+}
+
+/* =======================================================
+   FULL BOOTLOADER, BIOS POST & KERNEL INIT SUBSYSTEM
+   ======================================================= */
+.bootloader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000000;
+    color: #FFFFFF;
+    font-family: 'Courier New', Courier, monospace;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    box-sizing: border-box;
+    user-select: none;
+    overflow: hidden;
+}
+
+.bootloader-overlay::after {
+    content: " ";
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 3px, 6px 100%;
+    pointer-events: none;
+}
+
+.bios-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #555555;
+    padding-bottom: 10px;
+}
+
+.bios-logo-box {
+    border: 1px solid #FFFF00;
+    color: #FFFF00;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    background: #000080;
+}
+
+.bios-text-block {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #C0C0C0;
+}
+
+.bios-highlight {
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+.bios-green {
+    color: #00FF00;
+}
+
+.bios-cyan {
+    color: #00FFFF;
+}
+
+.bios-yellow {
+    color: #FFFF00;
+}
+
+/* GRUB 2 Menu Screen */
+.grub-menu-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 820px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.grub-title {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #FFFFFF;
+    margin-bottom: 12px;
+}
+
+.grub-box {
+    border: 2px solid #FFFFFF;
+    background-color: #000080;
+    padding: 12px;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.6);
+}
+
+.grub-entry {
+    padding: 6px 12px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.grub-entry.active,
+.grub-entry:hover {
+    background-color: #AAAAAA;
+    color: #000000;
+    font-weight: bold;
+}
+
+.grub-footer {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    color: #C0C0C0;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.grub-timer-badge {
+    color: #FFFF00;
+    font-weight: bold;
+}
+
+/* Kernel Boot Log Output */
+.kernel-log-screen {
+    flex-grow: 1;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #E0E0E0;
+    white-space: pre-wrap;
+    background: #000;
+}
+
+.kernel-log-ok {
+    color: #00FF00;
+    font-weight: bold;
+}
+
+/* Shut Down & Safe to Turn Off Overlay */
+.shutdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000000;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #FF8C00;
+    font-family: 'Times New Roman', serif;
+    user-select: none;
+    text-align: center;
+}
+
+.shutdown-msg-safe {
+    font-size: 2.2rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+    text-shadow: 0 0 10px rgba(255, 140, 0, 0.6);
+}
+
+.shutdown-power-btn {
+    margin-top: 20px;
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
+    padding: 6px 16px;
+    font-size: 0.9rem;
+    background: #C0C0C0;
+    border-top: 2px solid #FFF;
+    border-left: 2px solid #FFF;
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    cursor: pointer;
+    color: #000;
+}
+
+/* VM Appliance Creator Window Styles */
+.vm-architecture-diagram {
+    background: #000080;
+    color: #FFFFFF;
+    font-family: monospace;
+    font-size: 0.72rem;
+    padding: 8px;
+    border: 2px inset #808080;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.vm-spec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.vm-spec-card {
+    border: 1px inset #808080;
+    background: #FFFFFF;
+    padding: 6px;
+    font-size: 0.75rem;
+}
+
+.vm-spec-card strong {
+    color: #000080;
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Task Manager Window Styles */
+.taskmgr-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #808080;
+}
+
+.taskmgr-tab {
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    background: #D4D0C8;
+    border-top: 1px solid #FFF;
+    border-left: 1px solid #FFF;
+    border-right: 1px solid #808080;
+    cursor: pointer;
+}
+
+.taskmgr-tab.active {
+    background: #C0C0C0;
+    font-weight: bold;
+    border-bottom: 1px solid #C0C0C0;
+    margin-bottom: -1px;
+}
+
+.taskmgr-process-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+    background: #FFFFFF;
+}
+
+.taskmgr-process-table th {
+    background: #D4D0C8;
+    border-top: 1px solid #FFF;
+    border-left: 1px solid #FFF;
+    border-right: 1px solid #808080;
+    border-bottom: 1px solid #808080;
+    padding: 3px 6px;
+    text-align: left;
+    font-size: 0.7rem;
+}
+
+.taskmgr-process-table td {
+    padding: 2px 6px;
+    border-bottom: 1px solid #E0E0E0;
+    font-family: monospace;
+}
+
+.taskmgr-process-table tr.selected {
+    background: #000080;
+    color: #FFFFFF;
+}
+
+.taskmgr-graph-box {
+    background: #000000;
+    border: 2px inset #808080;
+    height: 70px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+/* Control Panel Grid Styles */
+.control-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 8px;
+    background: #FFFFFF;
+    border: 2px inset #808080;
+    height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    padding: 6px 4px;
+    font-size: 0.75rem;
+}
+
+.control-item:hover {
+    background-color: #E0E0E0;
+    outline: 1px dotted #000;
+}
+
+.control-item img,
+.control-item .control-icon {
+    font-size: 1.8rem;
+    margin-bottom: 4px;
+}
+
+/* Run Dialog & Shutdown Prompt */
+.system-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 5000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ==========================================================================
+   Volume Control: Advanced System Sound Mixer (sndvol32.exe)
+   ========================================================================== */
+
+.win95-menu-bar {
+    background: #C0C0C0;
+    border-bottom: 1px solid #808080;
+    display: flex;
+    align-items: center;
+    padding: 1px 6px;
+    font-size: 0.75rem;
+    gap: 8px;
+    user-select: none;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.win95-menu-item {
+    padding: 2px 6px;
+    cursor: pointer;
+    position: relative;
+}
+
+.win95-menu-item:hover,
+.win95-menu-item:focus {
+    background: #000080;
+    color: #FFFFFF;
+    outline: none;
+}
+
+.win95-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #C0C0C0;
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    min-width: 140px;
+    z-index: 1000;
+    padding: 2px;
+}
+
+.dropdown-item {
+    padding: 3px 10px;
+    color: #000000;
+    cursor: pointer;
+    font-size: 0.74rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.dropdown-item:hover {
+    background: #000080;
+    color: #FFFFFF;
+}
+
+.dropdown-separator {
+    height: 1px;
+    background: #808080;
+    border-bottom: 1px solid #FFFFFF;
+    margin: 3px 1px;
+}
+
+.mixer-menu-device-info {
+    margin-left: auto;
+    font-size: 0.68rem;
+    color: #333333;
+    padding-right: 4px;
+}
+
+.mixer-window-content {
+    display: flex;
+    flex-direction: column;
+    background: #C0C0C0;
+    padding: 6px;
+    gap: 6px;
+    height: calc(100% - 24px);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.mixer-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #D4D0C8;
+    border: 1px inset #808080;
+    padding: 4px 6px;
+    border-radius: 1px;
+}
+
+.mixer-toolbar-modes {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mixer-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mixer-toolbar .win95-btn {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+}
+
+.mixer-toolbar .win95-btn.active {
+    border-top: 1px solid #000000;
+    border-left: 1px solid #000000;
+    border-right: 1px solid #FFFFFF;
+    border-bottom: 1px solid #FFFFFF;
+    background: #E0E0E0;
+    font-weight: bold;
+}
+
+.mixer-channels-scroll-container {
+    flex-grow: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: #B0B0B0;
+    border: 2px inset #808080;
+    padding: 6px;
+    box-sizing: border-box;
+}
+
+.mixer-channels-rack {
+    display: flex;
+    gap: 6px;
+    height: 100%;
+    min-width: max-content;
+}
+
+.mixer-channel-strip {
+    width: 106px;
+    background: #C0C0C0;
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    box-shadow: 1px 1px 0 #000000;
+    padding: 4px 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    position: relative;
+    user-select: none;
+}
+
+.mixer-channel-strip.input-channel {
+    width: 114px;
+    background: #C8C4BC;
+}
+
+.mixer-channel-strip.muted-strip {
+    opacity: 0.78;
+    background: #B8B8B8;
+}
+
+.channel-header {
+    font-size: 0.72rem;
+    font-weight: bold;
+    color: #000080;
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid #808080;
+    padding-bottom: 2px;
+}
+
+.channel-type-badge {
+    font-size: 0.58rem;
+    color: #555555;
+    text-align: center;
+    margin-bottom: 4px;
+    line-height: 1.1;
+    font-family: monospace;
+}
+
+.channel-type-badge.input-badge {
+    color: #8B0000;
+    font-weight: bold;
+}
+
+.channel-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.channel-section-label {
+    font-size: 0.65rem;
+    color: #222222;
+    margin-bottom: 1px;
+}
+
+.balance-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    justify-content: center;
+}
+
+.pan-tick-label {
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: #444444;
+}
+
+/* Horizontal Range Slider for Balance (Pan) */
+.win95-horizontal-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 64px;
+    height: 14px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+}
+
+.win95-horizontal-range:focus {
+    outline: none;
+}
+
+.win95-horizontal-range::-webkit-slider-runnable-track {
+    height: 4px;
+    background: #808080;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #FFFFFF;
+    border-bottom: 1px solid #FFFFFF;
+}
+
+.win95-horizontal-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 15px;
+    background: #C0C0C0;
+    border-top: 1px solid #FFFFFF;
+    border-left: 1px solid #FFFFFF;
+    border-right: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    margin-top: -6px;
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.win95-horizontal-range::-webkit-slider-thumb:hover {
+    filter: brightness(1.15);
+}
+
+.win95-horizontal-range::-webkit-slider-thumb:active {
+    filter: brightness(0.9);
+}
+
+.win95-horizontal-range::-moz-range-track {
+    height: 4px;
+    background: #808080;
+    border-top: 1px solid #404040;
+    border-left: 1px solid #404040;
+    border-right: 1px solid #FFFFFF;
+    border-bottom: 1px solid #FFFFFF;
+}
+
+.win95-horizontal-range::-moz-range-thumb {
+    width: 10px;
+    height: 15px;
+    background: #C0C0C0;
+    border-top: 1px solid #FFFFFF;
+    border-left: 1px solid #FFFFFF;
+    border-right: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+    cursor: pointer;
+}
+
+.pan-readout {
+    font-size: 0.6rem;
+    color: #444444;
+    font-family: monospace;
+    text-align: center;
+}
+
+.fader-section {
+    flex-grow: 1;
+    justify-content: flex-start;
+}
+
+.fader-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 110px;
+    margin: 2px 0;
+}
+
+.fader-ticks {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100px;
+    font-size: 0.55rem;
+    color: #444444;
+    font-family: monospace;
+    text-align: right;
+    line-height: 1;
+}
+
+.fader-track {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 105px;
+    width: 26px;
+}
+
+.volume-db-badge {
+    font-size: 0.62rem;
+    font-family: monospace;
+    background: #FFFFFF;
+    border: 1px solid #808080;
+    padding: 1px 4px;
+    color: #000080;
+    text-align: center;
+    width: 90%;
+    margin-top: 2px;
+}
+
+.channel-footer {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    border-top: 1px solid #808080;
+    padding-top: 4px;
+    gap: 4px;
+    margin-top: auto;
+}
+
+.channel-solo-btn {
+    width: 100%;
+    font-size: 0.65rem;
+    padding: 2px;
+}
+
+/* ==========================================================================
+   Virtual Mic Live Level VU Meter (12 LED Segments)
+   ========================================================================== */
+
+.vu-section {
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.vu-meter-container {
+    display: flex;
+    gap: 4px;
+    background: #000000;
+    border: 1px inset #808080;
+    padding: 3px 4px;
+    align-items: center;
+    width: 90%;
+    box-sizing: border-box;
+}
+
+.vu-scale-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 60px;
+    font-size: 0.52rem;
+    color: #888888;
+    font-family: monospace;
+    line-height: 1;
+    text-align: right;
+    width: 22px;
+}
+
+.vu-meter-bars-row {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.vu-led-column {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 60px;
+    width: 20px;
+    justify-content: space-between;
+}
+
+.vu-led-segment {
+    width: 100%;
+    height: 3px;
+    background: #112211;
+    border-radius: 1px;
+    transition: background 0.04s ease, box-shadow 0.04s ease;
+}
+
+.vu-led-segment.green.active {
+    background: #00FF00;
+    box-shadow: 0 0 3px #00FF00;
+}
+
+.vu-led-segment.yellow {
+    background: #222200;
+}
+
+.vu-led-segment.yellow.active {
+    background: #FFFF00;
+    box-shadow: 0 0 3px #FFFF00;
+}
+
+.vu-led-segment.red {
+    background: #220000;
+}
+
+.vu-led-segment.red.active {
+    background: #FF2200;
+    box-shadow: 0 0 4px #FF0000;
+}
+
+.vu-numeric-readout {
+    font-size: 0.6rem;
+    font-family: monospace;
+    color: #00FF00;
+    background: #000000;
+    border: 1px inset #808080;
+    padding: 1px 4px;
+    width: 90%;
+    text-align: center;
+    margin-top: 2px;
+    box-sizing: border-box;
+}
+
+.vu-numeric-readout.clipping {
+    color: #FF2200;
+    font-weight: bold;
+}
+
+/* ==========================================================================
+   Properties Panel Modal (Device Channel Visibility)
+   ========================================================================== */
+
+.mixer-properties-panel {
+    position: absolute;
+    top: 36px;
+    left: 12px;
+    right: 12px;
+    bottom: 28px;
+    background: rgba(192, 192, 192, 0.96);
+    border: 2px outset #FFFFFF;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.mixer-modal-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    width: 90%;
+    max-width: 460px;
+    background: #C0C0C0;
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    box-shadow: 3px 3px 12px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.channel-toggles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #FFFFFF;
+    border: 2px inset #808080;
+    padding: 6px 8px;
+    max-height: 140px;
+    overflow-y: auto;
+}
+
+.win95-radio-label {
+    display: block;
+    font-size: 0.72rem;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.mixer-status-bar {
+    display: flex;
+    justify-content: space-between;
+    background: #C0C0C0;
+    border-top: 1px solid #808080;
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    color: #333333;
+    font-family: monospace;
+}
+
+/* ==========================================================================
+   Gemma 95 x86 Hardware Virtual Machine (v86 Wasm Core) Styles
+   ========================================================================== */
+
+.v86-window-content {
+    display: flex;
+    flex-direction: column;
+    background: #C0C0C0;
+    padding: 4px;
+    gap: 4px;
+    height: calc(100% - 24px);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* Hardware Front Panel & Bezel */
+.v86-front-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #242424;
+    border: 2px inset #666666;
+    padding: 4px 8px;
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.v86-led-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.v86-led-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.66rem;
+    font-weight: bold;
+    color: #AAAAAA;
+    user-select: none;
+}
+
+.v86-led-bulb {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3a3a3a;
+    border: 1px solid #111111;
+    transition: background 0.05s ease, box-shadow 0.05s ease;
+}
+
+.v86-led-bulb.green.active {
+    background: #00FF33;
+    box-shadow: 0 0 6px #00FF33;
+}
+
+.v86-led-bulb.red.active {
+    background: #FF2200;
+    box-shadow: 0 0 6px #FF2200;
+}
+
+.v86-led-bulb.amber.active {
+    background: #FF9900;
+    box-shadow: 0 0 6px #FF9900;
+}
+
+.v86-led-bulb.blue.active {
+    background: #00BFFF;
+    box-shadow: 0 0 6px #00BFFF;
+}
+
+.v86-led-bulb.yellow.active {
+    background: #FFFF00;
+    box-shadow: 0 0 6px #FFFF00;
+}
+
+.v86-lcd-display {
+    display: flex;
+    gap: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    font-weight: bold;
+    color: #00FF66;
+    background: #001a00;
+    padding: 2px 8px;
+    border: 1px inset #003300;
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.v86-lcd-metric {
+    white-space: nowrap;
+}
+
+/* Quick Hardware Action Toolbar */
+.v86-hardware-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #D4D0C8;
+    border: 1px inset #808080;
+    padding: 3px 6px;
+    gap: 4px;
+}
+
+.v86-hardware-toolbar .win95-btn {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+}
+
+.v86-toolbar-separator {
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    background: #808080;
+    border-right: 1px solid #FFFFFF;
+    margin: 0 3px;
+}
+
+/* Tab Deck */
+.v86-tabs-header {
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+    border-bottom: 2px solid #FFFFFF;
+}
+
+.v86-tab-btn {
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    background: #C0C0C0;
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
+    border-right: 2px solid #808080;
+    border-bottom: none;
+    cursor: pointer;
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
+    color: #000;
+}
+
+.v86-tab-btn.active {
+    background: #D4D0C8;
+    font-weight: bold;
+    border-bottom: 2px solid #D4D0C8;
+    margin-bottom: -2px;
+    z-index: 2;
+}
+
+.v86-tab-content {
+    flex-grow: 1;
+    background: #D4D0C8;
+    border: 2px solid #808080;
+    border-top: none;
+    padding: 6px;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* CRT Housing & Framebuffer Canvas */
+.v86-crt-housing {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #080808;
+    border: 4px inset #333333;
+    border-radius: 4px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9);
+}
+
+.v86-screen-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    background: #000;
+}
+
+.v86-screen-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+    cursor: default;
+}
+
+.v86-screen-container.crt-mode::after {
+    content: " ";
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+}
+
+/* Pointer Lock Retro HUD */
+.pointer-lock-hud {
+    position: absolute;
+    top: 14px;
+    z-index: 100;
+    background: #FFFFCC;
+    border: 2px solid #000000;
+    padding: 5px 14px;
+    font-size: 0.76rem;
+    font-weight: bold;
+    color: #000000;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pointer-lock-hud kbd {
+    background: #000080;
+    color: #FFFFFF;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-family: monospace;
+}
+
+.pointer-lock-hud.fade-out {
+    opacity: 0;
+}
+
+/* UART COM1 Serial Terminal */
+.v86-serial-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 4px;
+}
+
+.v86-serial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: bold;
+    color: #000080;
+}
+
+.v86-serial-terminal {
+    flex-grow: 1;
+    background: #000000;
+    color: #00FF00;
+    font-family: 'Courier New', monospace;
+    font-size: 0.76rem;
+    padding: 8px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    border: 2px inset #808080;
+}
+
+.v86-serial-input-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    background: #D4D0C8;
+    padding: 2px;
+}
+
+.v86-serial-input-field {
+    flex-grow: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 0.76rem;
+    padding: 2px 6px;
+    background: #FFFFFF;
+    border: 2px inset #808080;
+}
+
+/* Gemma Copilot Supervisor Deck */
+.v86-gemma-supervisor-deck {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 8px;
+    height: 100%;
+}
+
+.v86-gemma-left {
+    display: flex;
+    flex-direction: column;
+    background: #C0C0C0;
+    border: 1px inset #808080;
+    padding: 6px;
+}
+
+.v86-gemma-preview-frame {
+    flex-grow: 1;
+    background: #000000;
+    border: 2px inset #808080;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    min-height: 140px;
+}
+
+.v86-gemma-right {
+    display: flex;
+    flex-direction: column;
+    background: #C0C0C0;
+    border: 1px inset #808080;
+    padding: 6px;
+}
+
+.v86-gemma-feed {
+    flex-grow: 1;
+    background: #FFFFFF;
+    border: 2px inset #808080;
+    padding: 6px;
+    overflow-y: auto;
+    font-size: 0.74rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 280px;
+}
+
+.gemma-feed-entry {
+    padding: 4px 8px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.gemma-feed-entry.user {
+    background: #E8F0FE;
+    border-left: 3px solid #000080;
+    color: #000080;
+    font-weight: 500;
+}
+
+.gemma-feed-entry.gemma {
+    background: #F1F8E9;
+    border-left: 3px solid #2E7D32;
+    color: #1B5E20;
+}
+
+.gemma-feed-entry.system {
+    background: #F5F5F5;
+    font-family: monospace;
+    font-size: 0.68rem;
+    color: #555555;
+}
+
+.v86-gemma-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.gemma-pill {
+    background: #E0E0E0;
+    border: 1px solid #808080;
+    padding: 2px 6px;
+    font-size: 0.68rem;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 1px;
+}
+
+.gemma-pill:hover {
+    background: #FFFFFF;
+    border-color: #000080;
+}
+
+.v86-gemma-input-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+/* Storage Subsystem & OPFS */
+.v86-storage-deck {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.v86-drop-zone {
+    border: 2px dashed #808080;
+    background: #EAEAEA;
+    padding: 14px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.v86-drop-zone.dragover {
+    background: #D0E0FF;
+    border-color: #000080;
+}
+
+.v86-disk-table-container {
+    max-height: 160px;
+    overflow-y: auto;
+    border: 2px inset #808080;
+    background: #FFFFFF;
+}
+
+.v86-disk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+}
+
+.v86-disk-table th {
+    background: #000080;
+    color: #FFFFFF;
+    padding: 3px 6px;
+    text-align: left;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+}
+
+.v86-disk-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #E0E0E0;
+}
+
+.v86-status-bar {
+    display: flex;
+    justify-content: space-between;
+    background: #C0C0C0;
+    border-top: 1px solid #808080;
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    color: #333333;
+    font-family: monospace;
+}
+
+/* Hypervisor & RAM Isolation Shield Styles */
+.v86-hypervisor-deck {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 6px;
+    overflow-y: auto;
+    font-size: 0.72rem;
+}
+
+.hypervisor-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #E0E0E0;
+    border: 2px groove #FFFFFF;
+    padding: 4px 8px;
+    gap: 8px;
+}
+
+.hypervisor-state-badge {
+    padding: 2px 8px;
+    font-weight: bold;
+    font-size: 0.68rem;
+    border: 1px solid #000;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.hypervisor-state-badge.enforced {
+    background: #006600;
+    color: #FFFFFF;
+}
+
+.hypervisor-state-badge.alert {
+    background: #CC0000;
+    color: #FFFFFF;
+    animation: blink-alert 0.8s infinite alternate;
+}
+
+.hypervisor-state-badge.quarantined {
+    background: #800080;
+    color: #FFFFFF;
+}
+
+@keyframes blink-alert {
+    from { opacity: 1; }
+    to { opacity: 0.5; }
+}
+
+.hypervisor-quick-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.hyp-metric-chip {
+    background: #FFFFFF;
+    border: 2px inset #808080;
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+}
+
+.hyp-metric-chip .title {
+    font-size: 0.62rem;
+    color: #555;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.hyp-metric-chip .value {
+    font-size: 0.76rem;
+    font-family: monospace;
+    font-weight: bold;
+    color: #000080;
+    margin-top: 1px;
+}
+
+/* RAM Physical Allocation Matrix (64 Blocks) */
+.ram-matrix-card {
+    background: #FFFFFF;
+    border: 2px inset #808080;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ram-matrix-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 2px;
+    background: #222222;
+    padding: 4px;
+    border: 1px solid #000000;
+}
+
+.ram-block {
+    height: 16px;
+    border-radius: 1px;
+    cursor: pointer;
+    transition: transform 0.1s ease, filter 0.1s ease;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.ram-block:hover {
+    transform: scale(1.25);
+    filter: brightness(1.3);
+    z-index: 10;
+    box-shadow: 0 0 4px #FFFF00;
+}
+
+.ram-block.domain-hypervisor {
+    background: #222222;
+    border-color: #666666;
+}
+
+.ram-block.domain-kernel {
+    background: #0044AA;
+}
+
+.ram-block.domain-canary {
+    background: #DD0000;
+    box-shadow: inset 0 0 3px #FFAAAA;
+}
+
+.ram-block.domain-vram {
+    background: #00AAAA;
+}
+
+.ram-block.domain-dma {
+    background: #8800AA;
+}
+
+.ram-block.domain-clean {
+    background: #008800;
+}
+
+.ram-block.domain-dirty {
+    background: #DDAA00;
+}
+
+.ram-block.domain-quarantine {
+    background: #FF00FF;
+}
+
+.ram-matrix-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.65rem;
+    padding-top: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.legend-dot {
+    width: 9px;
+    height: 9px;
+    border: 1px solid #333;
+    display: inline-block;
+}
+
+/* Block Detail Inspector */
+.ram-inspector-details {
+    background: #FFFFEE;
+    border: 1px solid #808000;
+    padding: 4px 8px;
+    font-family: monospace;
+    font-size: 0.68rem;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Audit Log Feed */
+.hypervisor-log-feed {
+    height: 85px;
+    overflow-y: auto;
+    background: #000000;
+    color: #00FF00;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.68rem;
+    padding: 4px 6px;
+    border: 2px inset #808080;
+    line-height: 1.35;
+}
+
+.hypervisor-log-entry {
+    margin-bottom: 2px;
+    word-break: break-all;
+}
+
+.hypervisor-log-entry.SECURITY {
+    color: #FF5555;
+    font-weight: bold;
+}
+
+.hypervisor-log-entry.PURGE {
+    color: #FFFF55;
+}
+
+.hypervisor-log-entry.WARNING {
+    color: #FFAA00;
+}
+
+/* Action Controls Bar */
+.hypervisor-actions-bar {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* ==============================================================
+   Live Web Browser (chrome.exe) with Internet Gateway
+   ============================================================== */
+.browser-content-layout {
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+    background-color: #C0C0C0;
+    overflow: hidden;
+    height: 100%;
+}
+
+.browser-nav-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 4px 6px;
+    background: #C0C0C0;
+    border-bottom: 1px solid #808080;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.browser-nav-buttons {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.browser-nav-btn {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    min-width: 48px;
+    height: 24px;
+}
+
+.address-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-grow: 1;
+    background: #FFF;
+    border: 2px inset #808080;
+    padding: 1px 3px;
+}
+
+.browser-ssl-badge {
+    font-size: 0.68rem;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    user-select: none;
+}
+
+.browser-ssl-badge.secure {
+    background: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+}
+
+.browser-ssl-badge.insecure {
+    background: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+}
+
+.browser-address-bar {
+    flex-grow: 1;
+    border: none !important;
+    outline: none !important;
+    font-size: 0.78rem;
+    padding: 2px 4px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+}
+
+.browser-go-button {
+    font-weight: bold;
+    font-size: 0.72rem;
+    padding: 1px 8px;
+    height: 22px;
+}
+
+.browser-firewall-chip {
+    background: #e0e7ff;
+    border: 1px solid #818cf8;
+    color: #3730a3;
+    font-size: 0.68rem;
+    font-weight: bold;
+    padding: 1px 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    border-radius: 2px;
+    height: 22px;
+}
+
+.browser-firewall-chip:hover {
+    background: #c7d2fe;
+}
+
+.firewall-dot {
+    font-size: 0.65rem;
+}
+
+.firewall-dot.active {
+    color: #10b981;
+}
+
+.browser-bookmark-bar {
+    display: flex;
+    gap: 4px;
+    padding: 2px 6px;
+    background: #d4d0c8;
+    border-bottom: 1px solid #808080;
+    align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.bookmark-label {
+    font-size: 0.68rem;
+    font-weight: bold;
+    color: #444;
+    margin-right: 2px;
+}
+
+.bookmark-btn {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    background: #FFF;
+    border: 1px solid #999;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.bookmark-btn:hover {
+    background: #f0f0f0;
+}
+
+.browser-viewport {
+    flex-grow: 1;
+    position: relative;
+    background: #FFF;
+    overflow: hidden;
+}
+
+.browser-viewport iframe {
+    border: none;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.browser-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(230, 230, 230, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.browser-spinner-box {
+    background: #FFF;
+    border: 2px outset #FFF;
+    padding: 18px 24px;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.browser-spinner-icon {
+    font-size: 2.2rem;
+    animation: pulse 1.5s infinite;
+}
+
+.browser-status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 6px;
+    background: #C0C0C0;
+    border-top: 1px solid #808080;
+    font-size: 0.7rem;
+    color: #222;
+    flex-shrink: 0;
+}
+
+.status-sec-badge {
+    color: #006600;
+    font-weight: bold;
+}
+
+.status-fw-badge {
+    color: #000080;
+    font-weight: bold;
+}
+
+/* ==============================================================
+   macOS Application Firewall & Packet Filter (firewallWindow)
+   ============================================================== */
+.firewall-window-content {
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    background-color: #ECE9D8;
+    height: 100%;
+    overflow: hidden;
+}
+
+.firewall-tabs-header {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid #999;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+
+.firewall-tab {
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    background: #D4D0C8;
+    border: 1px solid #808080;
+    border-bottom: none;
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+    color: #222;
+}
+
+.firewall-tab.active {
+    font-weight: bold;
+    background: #FFF;
+    border-bottom: 1px solid #FFF;
+    color: #000080;
+}
+
+.firewall-tab-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.firewall-pane {
+    display: none;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.firewall-pane.active {
+    display: flex;
+}
+
+.firewall-hero-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #FFF;
+    border: 1px solid #B0B0B0;
+    padding: 12px 16px;
+    border-radius: 4px;
+}
+
+.firewall-hero-icon {
+    font-size: 2.4rem;
+    flex-shrink: 0;
+}
+
+.firewall-hero-text {
+    flex-grow: 1;
+}
+
+.firewall-hero-title {
+    font-size: 1.15rem;
+    font-weight: bold;
+}
+
+.firewall-hero-desc {
+    font-size: 0.74rem;
+    color: #555;
+    margin-top: 2px;
+    line-height: 1.35;
+}
+
+.firewall-action-btn {
+    font-size: 0.78rem;
+    font-weight: bold;
+    padding: 4px 14px;
+    height: 28px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.firewall-action-btn.btn-turn-off {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.firewall-action-btn.btn-turn-on {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.firewall-option-row {
+    margin-bottom: 8px;
+}
+
+.fw-opt-title {
+    font-weight: bold;
+    font-size: 0.75rem;
+    margin-left: 4px;
+}
+
+.fw-opt-desc {
+    font-size: 0.69rem;
+    color: #555;
+    margin-left: 22px;
+    margin-top: 1px;
+    line-height: 1.35;
+}
+
+.firewall-table-wrapper {
+    border: 2px inset #808080;
+    background: #FFF;
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: 280px;
+}
+
+.firewall-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.firewall-table th {
+    background: #E0E0E0;
+    padding: 4px 6px;
+    text-align: left;
+    font-size: 0.7rem;
+    border-bottom: 1px solid #999;
+}
+
+.firewall-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #EEE;
+    vertical-align: middle;
+}
+
+.firewall-rule-select {
+    padding: 2px 4px;
+    font-size: 0.72rem;
+    border: 1px solid #999;
+    border-radius: 2px;
+    background: #FFF;
+}
+
+.btn-remove-rule {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    color: #800000;
+}
+
+.firewall-domains-container {
+    background: #FFF;
+    border: 2px inset #808080;
+    padding: 8px;
+    flex-grow: 1;
+    overflow-y: auto;
+    min-height: 120px;
+}
+
+.firewall-domain-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    color: #b71c1c;
+    margin: 3px;
+}
+
+.domain-chip-remove {
+    background: transparent;
+    border: none;
+    color: #b71c1c;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.7rem;
+}
+
+.firewall-stats-ribbon {
+    display: flex;
+    gap: 12px;
+    background: #FFF;
+    border: 1px solid #B0B0B0;
+    padding: 6px 10px;
+    border-radius: 3px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+
+.stat-box {
+    font-size: 0.72rem;
+    display: flex;
+    gap: 4px;
+}
+
+.stat-label {
+    color: #666;
+}
+
+.firewall-monitor-table-wrapper {
+    border: 2px inset #808080;
+    background: #FFF;
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: 240px;
+}
+
+.firewall-monitor-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.68rem;
+    font-family: monospace;
+}
+
+.firewall-monitor-table th {
+    background: #E0E0E0;
+    padding: 3px 6px;
+    text-align: left;
+    border-bottom: 1px solid #999;
+    position: sticky;
+    top: 0;
+}
+
+.firewall-monitor-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #F0F0F0;
+    white-space: nowrap;
+}
+
+.packet-row.pass {
+    background: rgba(46, 204, 113, 0.04);
+}
+
+.packet-row.drop {
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.packet-row.stealth_drop {
+    background: rgba(243, 156, 18, 0.12);
+}
+
+.dir-badge {
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 1px 3px;
+    border-radius: 2px;
+}
+
+.dir-badge.inbound {
+    color: #2980b9;
+    background: #ebf5fb;
+}
+
+.dir-badge.outbound {
+    color: #8e44ad;
+    background: #f4ecf7;
+}
+
+.packet-decision-badge {
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: bold;
+    font-size: 0.65rem;
+}
+
+.packet-badge-pass {
+    background: #d4edda;
+    color: #155724;
+}
+
+.packet-badge-drop {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.packet-badge-stealth {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.firewall-lock-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid #B0B0B0;
+    padding: 6px 4px 2px 4px;
+    margin-top: auto;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+}
+
+.firewall-lock-button {
+    background: transparent;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.firewall-lock-label {
+    color: #444;
+}
+
+.taskbar-firewall-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.taskbar-firewall-indicator {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.taskbar-firewall-btn:hover .taskbar-firewall-indicator {
+    transform: scale(1.15);
+}
+
 

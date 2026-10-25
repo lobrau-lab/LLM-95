@@ -114,25 +114,254 @@ const PACKAGE_REGISTRY = [
   { name: 'lynx', version: '2.9.0', format: 'arch', size: '2.1 MB', installed: false, description: 'Text-mode web browser for terminal internet navigation', category: 'utilities' }
 ];
 
-let activeModelName = path.basename(MODEL_PATH) || 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+// Model Registry File Persistence (model-registry.json)
+const REGISTRY_FILE = path.join(__dirname, 'model-registry.json');
+
+function loadModelRegistry() {
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      const content = fs.readFileSync(REGISTRY_FILE, 'utf-8');
+      const data = JSON.parse(content);
+      data.bootCount = (data.bootCount || 0) + 1;
+      data.lastBootTimestamp = new Date().toISOString();
+      fs.writeFileSync(REGISTRY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log(`[Model Registry] Persistent registry loaded: ${data.activeModelName} (Boot #${data.bootCount})`);
+      return data;
+    }
+  } catch (err) {
+    console.warn('[Model Registry] Error reading registry file:', err);
+  }
+
+  const defaultRegistry = {
+    version: '1.0',
+    activeModelId: 'llama-3.2-3b-instruct-q4_k_m',
+    activeModelName: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+    activeModelPath: '/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+    autoReloadOnBoot: true,
+    lastSelectedTimestamp: new Date().toISOString(),
+    lastBootTimestamp: new Date().toISOString(),
+    bootCount: 1,
+    setupCompleted: false,
+    installedModels: [
+      {
+        id: 'llama-3.2-3b-instruct-q4_k_m',
+        name: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+        path: '/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+        size: '2.02 GB',
+        parameters: '3.2B',
+        quantization: 'Q4_K_M',
+        provisionedAt: new Date().toISOString()
+      }
+    ],
+    settings: {
+      threadsAllocated: CPU_THREADS,
+      contextSize: CTX_SIZE,
+      hypervisor: 'macOS Tahoe (Virtualization.framework / HVF)'
+    }
+  };
+
+  try {
+    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(defaultRegistry, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[Model Registry] Error writing default registry:', err);
+  }
+  return defaultRegistry;
+}
+
+function saveModelRegistry(update) {
+  let current;
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      current = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
+    } else {
+      current = loadModelRegistry();
+    }
+  } catch {
+    current = loadModelRegistry();
+  }
+
+  const updated = {
+    ...current,
+    ...update,
+    lastSelectedTimestamp: new Date().toISOString()
+  };
+
+  try {
+    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    console.log(`[Model Registry] Persisted update to model-registry.json (Active: ${updated.activeModelName})`);
+  } catch (e) {
+    console.warn('[Model Registry] Error updating registry file:', e);
+  }
+  return updated;
+}
+
+const persistentRegistry = loadModelRegistry();
+let activeModelName = (persistentRegistry.autoReloadOnBoot && persistentRegistry.activeModelName) 
+  ? persistentRegistry.activeModelName 
+  : (path.basename(MODEL_PATH) || 'Llama-3.2-3B-Instruct-Q4_K_M.gguf');
+
+AVAILABLE_MODELS.forEach(m => {
+  m.active = (m.id === persistentRegistry.activeModelId || m.name === activeModelName);
+});
+
 const startTime = Date.now();
 let lastInferenceLatency = 38;
 let totalTokensGenerated = 0;
 
-async function checkLlamaServer() {
+let customInferenceUrl = process.env.LLAMA_SERVER_URL || '';
+let activeInferenceConnection = {
+  type: 'standby',
+  name: 'LLM-95 On-Device Synthetic Core (Standby)',
+  url: '',
+  models: ['Llama-3.2-3B-Instruct-Q4_K_M.gguf'],
+  activeModel: activeModelName,
+  latencyMs: 32,
+  healthy: true
+};
+
+const INFERENCE_CANDIDATES = [
+  () => customInferenceUrl ? { url: customInferenceUrl.replace(/\/+$/, ''), hint: 'custom' } : null,
+  () => ({ url: 'http://127.0.0.1:11434', hint: 'ollama' }),
+  () => ({ url: 'http://localhost:11434', hint: 'ollama' }),
+  () => ({ url: 'http://10.0.2.2:11434', hint: 'ollama' }),
+  () => ({ url: 'http://host.docker.internal:11434', hint: 'ollama' }),
+  () => ({ url: 'http://127.0.0.1:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://localhost:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://10.0.2.2:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://host.docker.internal:1234', hint: 'lmstudio' }),
+  () => ({ url: 'http://127.0.0.1:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://localhost:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://10.0.2.2:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://host.docker.internal:8080', hint: 'llama_cpp' }),
+  () => ({ url: 'http://127.0.0.1:8000', hint: 'vllm' }),
+  () => ({ url: 'http://localhost:8000', hint: 'vllm' }),
+  () => ({ url: 'http://127.0.0.1:5000', hint: 'openai_generic' })
+];
+
+async function probeEndpoint(baseUrl) {
+  const cleanUrl = baseUrl.replace(/\/+$/, '');
+  const t0 = Date.now();
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch(`${LLAMA_SERVER_URL}/health`, { signal: controller.signal });
-    clearTimeout(timeout);
-    return res.ok;
-  } catch {
-    return false;
-  }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/api/tags`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const models = Array.isArray(data.models) ? data.models.map(m => m.name || m.model) : [];
+      let version = 'v0.x';
+      try {
+        const vRes = await fetch(`${cleanUrl}/api/version`, { signal: AbortSignal.timeout(300) });
+        if (vRes.ok) {
+          const vData = await vRes.json();
+          version = vData.version || version;
+        }
+      } catch {}
+      return {
+        type: 'ollama',
+        name: `Ollama (${version})`,
+        url: cleanUrl,
+        models: models.length ? models : ['llama3.2', 'llama3', 'mistral', 'phi3'],
+        activeModel: models[0] || 'llama3.2',
+        latencyMs: Date.now() - t0,
+        healthy: true,
+        version
+      };
+    }
+  } catch {}
+
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/v1/models`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const models = Array.isArray(data.data) ? data.data.map(m => m.id) : [];
+      const isLmStudio = cleanUrl.includes('1234') || (models.some(m => m.includes('/') || m.includes('gguf')));
+      return {
+        type: isLmStudio ? 'lmstudio' : 'openai_generic',
+        name: isLmStudio ? 'LM Studio' : 'OpenAI-Compatible Server',
+        url: cleanUrl,
+        models: models.length ? models : ['local-model'],
+        activeModel: models[0] || 'local-model',
+        latencyMs: Date.now() - t0,
+        healthy: true
+      };
+    }
+  } catch {}
+
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 650);
+    const res = await fetch(`${cleanUrl}/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      return {
+        type: 'llama_cpp',
+        name: 'llama.cpp Native Server',
+        url: cleanUrl,
+        models: [activeModelName],
+        activeModel: activeModelName,
+        latencyMs: Date.now() - t0,
+        healthy: true
+      };
+    }
+  } catch {}
+
+  return null;
 }
 
+async function universalAutoDetectInference(forceProbeUrl) {
+  if (forceProbeUrl) {
+    const detected = await probeEndpoint(forceProbeUrl);
+    if (detected) {
+      activeInferenceConnection = detected;
+      return detected;
+    }
+  }
+
+  const candidates = [];
+  const seen = new Set();
+  for (const fn of INFERENCE_CANDIDATES) {
+    const item = fn();
+    if (item && !seen.has(item.url)) {
+      seen.add(item.url);
+      candidates.push(item);
+    }
+  }
+
+  const probes = candidates.map(c => probeEndpoint(c.url));
+  const results = await Promise.allSettled(probes);
+
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value && r.value.healthy) {
+      activeInferenceConnection = r.value;
+      console.log(`[Universal Inference] Auto-detected: ${r.value.name} at ${r.value.url}`);
+      return r.value;
+    }
+  }
+
+  activeInferenceConnection = {
+    type: 'standby',
+    name: 'LLM-95 On-Device Synthetic Core (Standby)',
+    url: '',
+    models: AVAILABLE_MODELS.map(m => m.name),
+    activeModel: activeModelName,
+    latencyMs: 30,
+    healthy: true
+  };
+  return activeInferenceConnection;
+}
+
+universalAutoDetectInference().catch(() => {});
+
 app.get('/health', async (_req, res) => {
-  const isLlamaRunning = await checkLlamaServer();
+  if (activeInferenceConnection.type === 'standby') {
+    await universalAutoDetectInference().catch(() => {});
+  }
+  const isConnected = activeInferenceConnection.type !== 'standby' && activeInferenceConnection.healthy;
   const modelExists = fs.existsSync(MODEL_PATH);
   const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
   const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
@@ -140,8 +369,9 @@ app.get('/health', async (_req, res) => {
   const usedMemMb = totalMemMb - freeMemMb;
 
   res.json({
-    status: isLlamaRunning ? 'online' : (modelExists ? 'ready_to_load' : 'standby_emulation'),
-    engine: isLlamaRunning ? 'llama.cpp server (native)' : 'llama-95 on-device runtime',
+    status: isConnected ? 'online' : (modelExists ? 'ready_to_load' : 'standby_emulation'),
+    engine: isConnected ? `${activeInferenceConnection.name} (${activeInferenceConnection.url})` : 'llama-95 on-device runtime',
+    connection: activeInferenceConnection,
     model: activeModelName,
     modelPath: MODEL_PATH,
     modelFoundOnDisk: modelExists,
@@ -227,10 +457,112 @@ app.post('/api/models/select', (req, res) => {
   if (target) {
     activeModelName = target.name;
     AVAILABLE_MODELS.forEach(m => { m.active = m.id === target.id; });
-    res.json({ success: true, activeModel: target.name });
+    const reg = saveModelRegistry({
+      activeModelId: target.id,
+      activeModelName: target.name,
+      activeModelPath: `/models/${target.name}`
+    });
+    res.json({ success: true, activeModel: target.name, registry: reg });
   } else {
     res.status(404).json({ error: 'Model not found in registry' });
   }
+});
+
+/** Model Registry API: Get persistent registry status and configuration */
+app.get('/api/model-registry', (_req, res) => {
+  let registry;
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
+    } else {
+      registry = loadModelRegistry();
+    }
+  } catch {
+    registry = loadModelRegistry();
+  }
+
+  res.json({
+    success: true,
+    registryFile: REGISTRY_FILE,
+    activeModel: activeModelName,
+    registry,
+    models: AVAILABLE_MODELS
+  });
+});
+
+/** Model Registry API: Update persistent settings and active model */
+app.post('/api/model-registry', (req, res) => {
+  const { modelId, autoReloadOnBoot, settings, hardwareProfile } = req.body;
+  const target = modelId ? AVAILABLE_MODELS.find(m => m.id === modelId || m.name === modelId) : null;
+  
+  const updatePayload = {};
+  if (target) {
+    activeModelName = target.name;
+    AVAILABLE_MODELS.forEach(m => { m.active = m.id === target.id; });
+    updatePayload.activeModelId = target.id;
+    updatePayload.activeModelName = target.name;
+    updatePayload.activeModelPath = `/models/${target.name}`;
+  }
+  if (typeof autoReloadOnBoot === 'boolean') {
+    updatePayload.autoReloadOnBoot = autoReloadOnBoot;
+  }
+  if (settings) updatePayload.settings = settings;
+  if (hardwareProfile) updatePayload.hardwareProfile = hardwareProfile;
+
+  const saved = saveModelRegistry(updatePayload);
+  res.json({ success: true, message: 'Model Registry settings persisted to model-registry.json', registry: saved });
+});
+
+/** Model Registry API: Force reload last selected model from registry */
+app.post('/api/model-registry/reload', (_req, res) => {
+  const reg = loadModelRegistry();
+  if (reg.activeModelName) {
+    activeModelName = reg.activeModelName;
+    AVAILABLE_MODELS.forEach(m => {
+      m.active = (m.id === reg.activeModelId || m.name === reg.activeModelName);
+    });
+  }
+  res.json({
+    success: true,
+    reloadedModel: activeModelName,
+    activeModelId: reg.activeModelId,
+    bootCount: reg.bootCount,
+    message: `Reloaded ${activeModelName} from model-registry.json on boot.`
+  });
+});
+
+let masterVolume = 80;
+let isMuted = false;
+
+app.get('/api/system/sound', (_req, res) => {
+  res.json({
+    driver: 'VirtIO-Sound (virtio_snd ALSA Module)',
+    hostPipeline: 'macOS Tahoe CoreAudio Low-Latency Direct Passthrough',
+    sampleRate: 48000,
+    bitDepth: 24,
+    channels: 'Stereo (2.0)',
+    bufferSize: 512,
+    latencyMs: 10.6,
+    masterVolume,
+    isMuted,
+    retroEmulation: 'Sound Blaster 16 (IRQ 5, Port 220)'
+  });
+});
+
+app.post('/api/system/sound', (req, res) => {
+  const { volume, muted } = req.body;
+  if (typeof volume === 'number') {
+    masterVolume = Math.max(0, Math.min(100, Math.round(volume)));
+  }
+  if (typeof muted === 'boolean') {
+    isMuted = muted;
+  }
+  res.json({
+    success: true,
+    masterVolume,
+    isMuted,
+    status: isMuted ? 'MUTED' : `${masterVolume}%`
+  });
 });
 
 /** Deep Hardware Scanner & Model Recommendation Engine */
@@ -301,7 +633,7 @@ app.get('/api/hardware/scan', (_req, res) => {
 
 /** Direct Sealed VM Model Provisioning Endpoint */
 app.post('/api/vm/provision', async (req, res) => {
-  const { modelId, modelName } = req.body;
+  const { modelId, modelName, hardwareProfile } = req.body;
   const target = AVAILABLE_MODELS.find(m => m.id === modelId || m.name === modelName);
 
   if (!target) {
@@ -313,7 +645,27 @@ app.post('/api/vm/provision', async (req, res) => {
     m.active = m.id === target.id;
   });
 
-  console.log(`[LLM-95 PROVISION] Model ${target.name} downloaded & locked as Sealed VM OS Kernel.`);
+  const reg = saveModelRegistry({
+    activeModelId: target.id,
+    activeModelName: target.name,
+    activeModelPath: `/models/${target.name}`,
+    setupCompleted: true,
+    autoReloadOnBoot: true,
+    hardwareProfile: hardwareProfile || undefined,
+    installedModels: [
+      {
+        id: target.id,
+        name: target.name,
+        path: `/models/${target.name}`,
+        size: target.size,
+        parameters: target.parameters,
+        quantization: target.quantization,
+        provisionedAt: new Date().toISOString()
+      }
+    ]
+  });
+
+  console.log(`[LLM-95 PROVISION] Model ${target.name} downloaded & saved to persistent model registry.`);
 
   res.json({
     success: true,
@@ -322,7 +674,8 @@ app.post('/api/vm/provision', async (req, res) => {
     path: `/models/${target.name}`,
     kernelSymlink: '/models/kernel-brain.gguf',
     kernelStatus: 'SEALED_OS_ACTIVE',
-    message: `Model ${target.name} downloaded directly into VM area and flashed as the operating system kernel.`
+    registry: reg,
+    message: `Model ${target.name} downloaded directly into VM area, registered in model-registry.json, and flashed as operating system kernel.`
   });
 });
 
@@ -649,18 +1002,174 @@ Responding to your prompt: "${prompt.slice(0, 100)}${prompt.length > 100 ? '...'
 In this self-contained VM architecture, inference executes entirely on-device via quantized GGUF tensor operations without transmitting data over the network. The system latency is running at ${lastInferenceLatency}ms with memory consumption locked under 2.1GB.`;
 }
 
+app.get('/api/inference/detect', async (req, res) => {
+  const probeUrl = req.query.url;
+  const detected = await universalAutoDetectInference(probeUrl);
+  res.json({
+    success: true,
+    detected,
+    message: detected.type !== 'standby'
+      ? `Successfully detected and connected to local inference: ${detected.name} at ${detected.url}`
+      : 'No active external local engine responded; using sealed on-device retro synthetic runtime.'
+  });
+});
+
+app.get('/api/inference/status', (_req, res) => {
+  res.json({
+    connection: activeInferenceConnection,
+    customUrl: customInferenceUrl,
+    activeModel: activeModelName
+  });
+});
+
+app.post('/api/inference/config', async (req, res) => {
+  const { url, activeModel, forceType } = req.body;
+  if (typeof url === 'string') {
+    customInferenceUrl = url.trim();
+  }
+  const detected = await universalAutoDetectInference(customInferenceUrl || undefined);
+  if (activeModel && typeof activeModel === 'string') {
+    detected.activeModel = activeModel;
+    activeInferenceConnection.activeModel = activeModel;
+  }
+  if (forceType && typeof forceType === 'string') {
+    detected.type = forceType;
+  }
+  res.json({
+    success: true,
+    connection: detected,
+    message: `Inference connection configured: ${detected.name}`
+  });
+});
+
+app.post('/api/inference/proxy', async (req, res) => {
+  const { targetUrl, path = '/api/generate', method = 'POST', body = {} } = req.body;
+  const destination = (targetUrl || activeInferenceConnection.url || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+  try {
+    const proxyRes = await fetch(`${destination}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await proxyRes.json();
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: `Proxy failed to connect to ${destination}: ${err.message}` });
+  }
+});
+
 app.post('/api/generate', async (req, res) => {
   const startTimeMs = Date.now();
-  const { prompt, stream = false, contextType = 'general', temperature = 0.7, max_tokens = 512 } = req.body;
+  const { prompt, stream = false, contextType = 'general', temperature = 0.7, max_tokens = 512, model } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ error: 'Missing prompt' });
   }
 
-  const isLlamaRunning = await checkLlamaServer();
-  if (isLlamaRunning) {
+  // 1. If Ollama is connected
+  if (activeInferenceConnection.healthy && activeInferenceConnection.type === 'ollama' && activeInferenceConnection.url) {
     try {
-      const llamaRes = await fetch(`${LLAMA_SERVER_URL}/completion`, {
+      const targetModel = model || activeInferenceConnection.activeModel || (activeInferenceConnection.models[0] || 'llama3.2');
+      const ollamaRes = await fetch(`${activeInferenceConnection.url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          prompt,
+          stream,
+          options: { temperature }
+        })
+      });
+
+      if (ollamaRes.ok) {
+        if (stream && ollamaRes.body) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          const reader = ollamaRes.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buf = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const parsed = JSON.parse(line);
+                res.write(`data: ${JSON.stringify({ content: parsed.response || '' })}\n\n`);
+                if (parsed.done) {
+                  res.write('data: [DONE]\n\n');
+                }
+              } catch {}
+            }
+          }
+          res.end();
+          return;
+        } else {
+          const data = await ollamaRes.json();
+          lastInferenceLatency = Date.now() - startTimeMs;
+          return res.json({
+            text: data.response || '',
+            latencyMs: lastInferenceLatency,
+            tokensPredicted: data.eval_count || 30,
+            model: targetModel,
+            engine: activeInferenceConnection.name
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Universal Inference] Ollama call error:', e);
+    }
+  }
+
+  // 2. If LM Studio or OpenAI-compatible server is connected
+  if (activeInferenceConnection.healthy && (activeInferenceConnection.type === 'lmstudio' || activeInferenceConnection.type === 'openai_generic' || activeInferenceConnection.type === 'vllm') && activeInferenceConnection.url) {
+    try {
+      const targetModel = model || activeInferenceConnection.activeModel || (activeInferenceConnection.models[0] || 'local-model');
+      const openaiRes = await fetch(`${activeInferenceConnection.url}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [{ role: 'user', content: prompt }],
+          stream,
+          temperature,
+          max_tokens
+        })
+      });
+
+      if (openaiRes.ok) {
+        if (stream && openaiRes.body) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          openaiRes.body.pipe(res);
+          return;
+        } else {
+          const data = await openaiRes.json();
+          lastInferenceLatency = Date.now() - startTimeMs;
+          const content = data.choices?.[0]?.message?.content || '';
+          return res.json({
+            text: content,
+            latencyMs: lastInferenceLatency,
+            tokensPredicted: data.usage?.completion_tokens || 30,
+            model: targetModel,
+            engine: activeInferenceConnection.name
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Universal Inference] LM Studio / OpenAI call error:', e);
+    }
+  }
+
+  // 3. If native llama.cpp server is connected
+  if (activeInferenceConnection.healthy && activeInferenceConnection.type === 'llama_cpp' && activeInferenceConnection.url) {
+    try {
+      const llamaRes = await fetch(`${activeInferenceConnection.url}/completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -686,15 +1195,17 @@ app.post('/api/generate', async (req, res) => {
             text: data.content || '',
             latencyMs: lastInferenceLatency,
             tokensPredicted: data.tokens_predicted,
-            model: activeModelName
+            model: activeModelName,
+            engine: activeInferenceConnection.name
           });
         }
       }
     } catch (e) {
-      console.warn('llama-server request failed, falling back to local synthesizer:', e);
+      console.warn('[Universal Inference] llama.cpp request error:', e);
     }
   }
 
+  // 4. Standby Synthetic Core (Always Works, Zero-Downtime Guarantee)
   const text = synthesizeLocalResponse(prompt, contextType);
   const words = text.split(' ');
   lastInferenceLatency = Math.min(80, Math.max(15, Math.floor(words.length * 1.8)));
@@ -716,13 +1227,14 @@ app.post('/api/generate', async (req, res) => {
       const chunk = (index === 0 ? '' : ' ') + words[index];
       res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
       index++;
-    }, 45);
+    }, 40);
   } else {
     res.json({
       text,
       latencyMs: lastInferenceLatency,
       tokensPredicted: words.length,
-      model: activeModelName
+      model: activeModelName,
+      engine: 'LLM-95 Retro On-Device Synthetic Core'
     });
   }
 });

@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "activeModelId": "gemma-2-2b-it-q4_k_m",
+  "activeModelName": "Gemma-2-2B-it-Q4_K_M.gguf",
+  "activeModelPath": "/models/Gemma-2-2B-it-Q4_K_M.gguf",
+  "autoReloadOnBoot": true,
+  "lastSelectedTimestamp": "2026-10-24T17:00:00.000Z",
+  "lastBootTimestamp": "2026-10-24T17:00:00.000Z",
+  "bootCount": 1,
+  "setupCompleted": true,
+  "hardwareProfile": {
+    "arch": "arm64",
+    "vectorUnit": "ARM NEON SIMD (Apple Silicon Engine)",
+    "recommendedModelId": "gemma-2-2b-it-q4_k_m"
+  },
+  "installedModels": [
+    {
+      "id": "gemma-2-2b-it-q4_k_m",
+      "name": "Gemma-2-2B-it-Q4_K_M.gguf",
+      "path": "/models/Gemma-2-2B-it-Q4_K_M.gguf",
+      "size": "1.62 GB",
+      "parameters": "2.6B",
+      "quantization": "Q4_K_M",
+      "provisionedAt": "2026-10-24T17:00:00.000Z"
+    }
+  ],
+  "settings": {
+    "threadsAllocated": 4,
+    "contextSize": 2048,
+    "hypervisor": "macOS Tahoe (Virtualization.framework / HVF)",
+    "graphicsDriver": "VirtIO-GPU (Apple Metal 3 Direct Passthrough)",
+    "audioDriver": "VirtIO-Sound (macOS CoreAudio 48kHz Stereo)"
+  }
+}
