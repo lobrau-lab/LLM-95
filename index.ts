@@ -2073,7 +2073,11 @@ const OSController = {
     const data = await res.json();
     if (screen) {
       if (data.output === '__CLEAR__') {
-        screen.innerHTML = `<pre class="terminal-pre">C:\\LLM95&gt; ${command}\n</pre>`;
+        screen.textContent = '';
+        const p = document.createElement('pre');
+        p.className = 'terminal-pre';
+        p.textContent = `C:\\LLM95> ${command}\n`;
+        screen.appendChild(p);
       } else {
         const p = document.createElement('pre');
         p.className = 'terminal-pre';
@@ -2483,7 +2487,11 @@ function initTerminalWindow(windowElement: HTMLDivElement): void {
     const data = await res.json();
 
     if (data.output === '__CLEAR__') {
-      screenEl.innerHTML = `<pre class="terminal-pre">C:\\LLM95&gt; ${trimmed}\n</pre>`;
+      screenEl.textContent = '';
+      const p = document.createElement('pre');
+      p.className = 'terminal-pre';
+      p.textContent = `C:\\LLM95> ${trimmed}\n`;
+      screenEl.appendChild(p);
     } else {
       const p = document.createElement('pre');
       p.className = 'terminal-pre';
@@ -2573,14 +2581,31 @@ function initPackageManager(windowElement: HTMLDivElement): void {
           installedTbody.innerHTML = '';
           pkgs.filter((p: any) => p.installed).forEach((p: any) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><strong>${p.name}</strong></td>
-              <td>${p.version}</td>
-              <td><span style="font-family: monospace;">${p.format.toUpperCase()}</span></td>
-              <td>${p.size}</td>
-              <td><button class="win95-btn" style="padding: 1px 6px; font-size: 0.7rem;">Remove</button></td>
-            `;
-            tr.querySelector('button')?.addEventListener('click', async () => {
+            
+            const td1 = document.createElement('td');
+            const strong = document.createElement('strong');
+            strong.textContent = p.name;
+            td1.appendChild(strong);
+
+            const td2 = document.createElement('td');
+            td2.textContent = p.version;
+
+            const td3 = document.createElement('td');
+            const span = document.createElement('span');
+            span.style.fontFamily = 'monospace';
+            span.textContent = p.format.toUpperCase();
+            td3.appendChild(span);
+
+            const td4 = document.createElement('td');
+            td4.textContent = p.size;
+
+            const td5 = document.createElement('td');
+            const btn = document.createElement('button');
+            btn.className = 'win95-btn';
+            btn.style.padding = '1px 6px';
+            btn.style.fontSize = '0.7rem';
+            btn.textContent = 'Remove';
+            btn.addEventListener('click', async () => {
               await fetch('/api/packages/remove', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2588,6 +2613,14 @@ function initPackageManager(windowElement: HTMLDivElement): void {
               });
               refreshPackages();
             });
+            td5.appendChild(btn);
+
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            tr.appendChild(td3);
+            tr.appendChild(td4);
+            tr.appendChild(td5);
+
             installedTbody.appendChild(tr);
           });
         }
@@ -2596,14 +2629,41 @@ function initPackageManager(windowElement: HTMLDivElement): void {
           availableTbody.innerHTML = '';
           pkgs.forEach((p: any) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><strong>${p.name}</strong><br><small style="color:#666;">${p.description}</small></td>
-              <td>${p.version}</td>
-              <td><span style="font-family: monospace;">${p.format.toUpperCase()}</span></td>
-              <td>${p.size}</td>
-              <td><button class="win95-btn" style="padding: 1px 6px; font-size: 0.7rem;" ${p.installed ? 'disabled' : ''}>${p.installed ? 'Installed' : 'Install'}</button></td>
-            `;
-            tr.querySelector('button')?.addEventListener('click', async () => {
+
+            const td1 = document.createElement('td');
+            const strong = document.createElement('strong');
+            strong.textContent = p.name;
+            td1.appendChild(strong);
+            td1.appendChild(document.createElement('br'));
+            const small = document.createElement('small');
+            small.style.color = '#666';
+            small.textContent = p.description;
+            td1.appendChild(small);
+
+            const td2 = document.createElement('td');
+            td2.textContent = p.version;
+
+            const td3 = document.createElement('td');
+            const span = document.createElement('span');
+            span.style.fontFamily = 'monospace';
+            span.textContent = p.format.toUpperCase();
+            td3.appendChild(span);
+
+            const td4 = document.createElement('td');
+            td4.textContent = p.size;
+
+            const td5 = document.createElement('td');
+            const btn = document.createElement('button');
+            btn.className = 'win95-btn';
+            btn.style.padding = '1px 6px';
+            btn.style.fontSize = '0.7rem';
+            if (p.installed) {
+              btn.disabled = true;
+              btn.textContent = 'Installed';
+            } else {
+              btn.textContent = 'Install';
+            }
+            btn.addEventListener('click', async () => {
               if (progressContainer) progressContainer.style.display = 'block';
               if (statusText) statusText.textContent = `Connecting to web mirror and pulling ${p.name}...`;
               if (progressBar) progressBar.style.width = '35%';
@@ -2621,6 +2681,14 @@ function initPackageManager(windowElement: HTMLDivElement): void {
               await new Promise(r => setTimeout(r, 500));
               refreshPackages();
             });
+            td5.appendChild(btn);
+
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            tr.appendChild(td3);
+            tr.appendChild(td4);
+            tr.appendChild(td5);
+
             availableTbody.appendChild(tr);
           });
         }
@@ -2776,13 +2844,37 @@ function initLlamaEngine(windowElement: HTMLDivElement): void {
           data.models.forEach((m: any) => {
             const tr = document.createElement('tr');
             if (m.name === activeModelName || m.active) tr.classList.add('selected');
-            tr.innerHTML = `
-              <td><strong>${m.name}</strong></td>
-              <td>${m.size}</td>
-              <td>${m.parameters}</td>
-              <td><span style="font-family: monospace;">${m.quantization}</span></td>
-              <td><button class="win95-btn" style="padding: 1px 6px; font-size: 0.7rem;">${m.active ? 'Loaded' : 'Switch'}</button></td>
-            `;
+
+            const td1 = document.createElement('td');
+            const strong = document.createElement('strong');
+            strong.textContent = m.name;
+            td1.appendChild(strong);
+
+            const td2 = document.createElement('td');
+            td2.textContent = m.size;
+
+            const td3 = document.createElement('td');
+            td3.textContent = m.parameters;
+
+            const td4 = document.createElement('td');
+            const span = document.createElement('span');
+            span.style.fontFamily = 'monospace';
+            span.textContent = m.quantization;
+            td4.appendChild(span);
+
+            const td5 = document.createElement('td');
+            const btn = document.createElement('button');
+            btn.className = 'win95-btn';
+            btn.style.padding = '1px 6px';
+            btn.style.fontSize = '0.7rem';
+            btn.textContent = m.active ? 'Loaded' : 'Switch';
+            td5.appendChild(btn);
+
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+            tr.appendChild(td3);
+            tr.appendChild(td4);
+            tr.appendChild(td5);
             tr.addEventListener('click', async () => {
               activeModelName = m.name;
               if (activeModelLabel) activeModelLabel.textContent = m.name;
@@ -3199,23 +3291,57 @@ function initSetupWizard(windowElement: HTMLDivElement): void {
       const isRec = m.isRecommended || m.id === selectedModelId;
       const card = document.createElement('div');
       card.className = `wiz-model-option ${isSelected ? 'selected' : ''} ${isRec ? 'recommended' : ''}`;
-      card.innerHTML = `
-        <input type="radio" class="wiz-model-radio" name="wiz-model-choice" value="${m.id}" ${isSelected ? 'checked' : ''} />
-        <div class="wiz-model-details">
-          <div class="wiz-model-name-row">
-            <span class="wiz-model-name">${m.name}</span>
-            ${isRec ? '<span class="wiz-model-recommended-pill">★ BEST MATCH FOR YOUR HARDWARE</span>' : ''}
-          </div>
-          <div class="wiz-model-specs-row">
-            <span>📦 Disk: <strong>${m.size}</strong></span>
-            <span>🧠 Params: <strong>${m.parameters}</strong></span>
-            <span>⚙️ Quant: <strong>${m.quantization}</strong></span>
-            <span>⚡ RAM: <strong>~${m.ramRequirementMb} MB</strong></span>
-            <span>🚀 Speed: <strong>${m.expectedTokensPerSec}</strong></span>
-          </div>
-          <div class="wiz-model-desc">${m.description}</div>
-        </div>
-      `;
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.className = 'wiz-model-radio';
+      radio.name = 'wiz-model-choice';
+      radio.value = m.id;
+      radio.checked = isSelected;
+
+      const details = document.createElement('div');
+      details.className = 'wiz-model-details';
+
+      const nameRow = document.createElement('div');
+      nameRow.className = 'wiz-model-name-row';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'wiz-model-name';
+      nameSpan.textContent = m.name;
+      nameRow.appendChild(nameSpan);
+
+      if (isRec) {
+        const pill = document.createElement('span');
+        pill.className = 'wiz-model-recommended-pill';
+        pill.textContent = '★ BEST MATCH FOR YOUR HARDWARE';
+        nameRow.appendChild(pill);
+      }
+      details.appendChild(nameRow);
+
+      const specsRow = document.createElement('div');
+      specsRow.className = 'wiz-model-specs-row';
+
+      const addSpec = (label: string, val: string) => {
+        const span = document.createElement('span');
+        span.textContent = `${label}: `;
+        const strong = document.createElement('strong');
+        strong.textContent = val;
+        span.appendChild(strong);
+        specsRow.appendChild(span);
+      };
+      addSpec('📦 Disk', m.size);
+      addSpec('🧠 Params', m.parameters);
+      addSpec('⚙️ Quant', m.quantization);
+      addSpec('⚡ RAM', `~${m.ramRequirementMb} MB`);
+      addSpec('🚀 Speed', m.expectedTokensPerSec);
+      details.appendChild(specsRow);
+
+      const descDiv = document.createElement('div');
+      descDiv.className = 'wiz-model-desc';
+      descDiv.textContent = m.description;
+      details.appendChild(descDiv);
+
+      card.appendChild(radio);
+      card.appendChild(details);
 
       card.addEventListener('click', () => {
         selectedModelId = m.id;
@@ -3362,7 +3488,16 @@ Connecting to on-device storage bus...</pre>`;
       if (chatHistory) {
         const welcomeP = document.createElement('p');
         welcomeP.className = 'gemini-message assistant-message';
-        welcomeP.innerHTML = `<strong>[SEALED OS KERNEL: ${activeModelName}]</strong><br>Welcome to LLM-95! I have been downloaded directly into your virtual machine storage area and flashed as the operating system kernel.<br><br>All inference runs on-device via CPU vector units, tuned for macOS Tahoe VirtIO-GPU &amp; VirtIO-Sound. What would you like to run on this computer?`;
+
+        const strong = document.createElement('strong');
+        strong.textContent = `[SEALED OS KERNEL: ${activeModelName}]`;
+        welcomeP.appendChild(strong);
+        welcomeP.appendChild(document.createElement('br'));
+        welcomeP.appendChild(document.createTextNode('Welcome to LLM-95! I have been downloaded directly into your virtual machine storage area and flashed as the operating system kernel.'));
+        welcomeP.appendChild(document.createElement('br'));
+        welcomeP.appendChild(document.createElement('br'));
+        welcomeP.appendChild(document.createTextNode('All inference runs on-device via CPU vector units, tuned for macOS Tahoe VirtIO-GPU & VirtIO-Sound. What would you like to run on this computer?'));
+
         chatHistory.appendChild(welcomeP);
         chatHistory.scrollTop = chatHistory.scrollHeight;
       }
@@ -3426,7 +3561,13 @@ async function initGeminiChat(windowElement: HTMLDivElement): Promise<void> {
   function addActionChip(container: HTMLDivElement, actionText: string) {
     const div = document.createElement('div');
     div.className = 'operator-action-chip';
-    div.innerHTML = `<span>⚡</span> <span>[PILOT OPERATING SYSTEM: ${actionText}]</span>`;
+    const span1 = document.createElement('span');
+    span1.textContent = '⚡';
+    const span2 = document.createElement('span');
+    span2.textContent = `[PILOT OPERATING SYSTEM: ${actionText}]`;
+    div.appendChild(span1);
+    div.appendChild(document.createTextNode(' '));
+    div.appendChild(span2);
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -4337,7 +4478,11 @@ async function initMediaPlayer(windowElement: HTMLDivElement): Promise<void> {
         playerVars: { playsinline: 1, autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 0 }
       });
     } catch (error: any) {
-      playerDiv.innerHTML = `<p class="media-player-status-message">Ready: ${videoId}</p>`;
+      playerDiv.textContent = '';
+      const p = document.createElement('p');
+      p.className = 'media-player-status-message';
+      p.textContent = `Ready: ${videoId}`;
+      playerDiv.appendChild(p);
     }
   };
 
