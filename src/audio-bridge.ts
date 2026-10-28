@@ -47,7 +47,6 @@ export class SoundBlasterAudioBridge {
           });
           this.workletNode.connect(this.gainNode);
           workletLoaded = true;
-          console.log('[AudioBridge] Sound Blaster 16: AudioWorklet ring-buffer active.');
         } catch (workletErr) {
           console.warn('[AudioBridge] AudioWorklet init failed; using ScriptProcessor fallback:', workletErr);
         }
@@ -74,7 +73,6 @@ export class SoundBlasterAudioBridge {
           }
         };
         this.fallbackNode.connect(this.gainNode);
-        console.log('[AudioBridge] Sound Blaster 16: ScriptProcessor ring-buffer active.');
       }
 
       // Listen to v86 sound output
